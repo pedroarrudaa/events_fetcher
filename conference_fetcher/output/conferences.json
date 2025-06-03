@@ -1,0 +1,187 @@
+[
+  {
+    "name": "World Summit AI USA",
+    "url": "https://usa.worldsummit.ai/",
+    "remote": false,
+    "city": "San Francisco",
+    "short_description": "Join pioneering thinkers at the only global gathering focused on driving real, meaningful change in AI.",
+    "start_date": "2025-06-18",
+    "end_date": "2025-06-19",
+    "registration_deadline": null,
+    "speakers": [
+      {
+        "name": "Alex Iftimie",
+        "company": "OpenAI",
+        "title": "Deputy General Counsel"
+      },
+      {
+        "name": "Gary Marcus",
+        "company": "NYU",
+        "title": "Professor Emeritus"
+      },
+      {
+        "name": "Nina Jankowicz",
+        "company": "The American Sunlight Project",
+        "title": "Co-Founder & CEO"
+      },
+      {
+        "name": "Ben Goertzel",
+        "company": "ASI Alliance & TrueAGI",
+        "title": "CEO"
+      },
+      {
+        "name": "Divya Chander",
+        "company": "Lucidify",
+        "title": "CEO & Founder"
+      },
+      {
+        "name": "Stuart Russell",
+        "company": "Berkeley University",
+        "title": "Professor of Computer Science"
+      },
+      {
+        "name": "Pablos Holman",
+        "company": "Deep Future",
+        "title": "Managing Partner"
+      },
+      {
+        "name": "Andrew Hessel",
+        "company": "Genome Project-write",
+        "title": "Chairman"
+      },
+      {
+        "name": "Payal Arora",
+        "company": "Utrecht University",
+        "title": "Professor of Inclusive AI Cultures"
+      },
+      {
+        "name": "Srujana Kaddevarmuth",
+        "company": "Walmart",
+        "title": "President & Group Director Machine Learning Center of Excellence"
+      },
+      {
+        "name": "Robert Silvers",
+        "company": "Ropes & Gray",
+        "title": "Partner & Former Under Secretary for Policy, U.S. Department of Homeland Security"
+      },
+      {
+        "name": "Vanessa Parli",
+        "company": "Stanford Institute for Human-Centered AI",
+        "title": "Director of Research"
+      }
+    ],
+    "sponsors": [],
+    "ticket_price": [
+      {
+        "label": "Early Bird",
+        "price": "$99"
+      },
+      {
+        "label": "Standard",
+        "price": "$199"
+      }
+    ],
+    "is_paid": true,
+    "themes": []
+  },
+  {
+    "name": "Generative AI Summit",
+    "url": "https://world.aiacceleratorinstitute.com/location/newyork",
+    "remote": false,
+    "city": "New York",
+    "short_description": "Connect with NYC's applied ecosystem. Validate your ideas. Deploy powerful products.",
+    "start_date": "2025-06-05",
+    "end_date": "2025-06-05",
+    "registration_deadline": null,
+    "speakers": [
+      {
+        "name": "Ash Dhupar",
+        "company": "Analog Devices",
+        "title": "Chief Data & Analytics Officer"
+      },
+      {
+        "name": "Philipp Schmid",
+        "company": "Google Deepmind",
+        "title": "Developer Experience"
+      },
+      {
+        "name": "Archie Mayani",
+        "company": "GHX",
+        "title": "Chief Product Officer"
+      },
+      {
+        "name": "Frank Indiviglio",
+        "company": "NOAA: National Oceanic & Atmospheric Administration",
+        "title": "Chief Technology Officer"
+      },
+      {
+        "name": "Joseph Nelson",
+        "company": "Roboflow",
+        "title": "CEO & Co-Founder"
+      },
+      {
+        "name": "Drew Proud",
+        "company": "Google Deepmind",
+        "title": "Senior Engineer, AI Safety"
+      },
+      {
+        "name": "Tim Sehn",
+        "company": "DoltHub",
+        "title": "Founder & CEO"
+      },
+      {
+        "name": "Jyothsna Padmakumar Bindu",
+        "company": "BNY Mellon",
+        "title": "VP, Data Science"
+      },
+      {
+        "name": "Yuki Mitsufuji, PhD",
+        "company": "Sony",
+        "title": "VP, AI Research"
+      },
+      {
+        "name": "Akhil Khunger",
+        "company": "Barclays",
+        "title": "VP, QA Financial Modelling"
+      },
+      {
+        "name": "Stavros Zervoudakis",
+        "company": "NYU & ex-VP AI",
+        "title": "Assistant Professor"
+      },
+      {
+        "name": "Dr. Denise Turley",
+        "company": null,
+        "title": "VP; Executive Tech Leader"
+      },
+      {
+        "name": "Srebrina Tanova",
+        "company": "Warner Bros. Discovery",
+        "title": "Senior Director, Engineering"
+      },
+      {
+        "name": "Akash Sharma",
+        "company": "Vellum",
+        "title": "CEO & Founder"
+      },
+      {
+        "name": "Misam Abbas",
+        "company": "LinkedIn",
+        "title": "Staff AI Engineer"
+      }
+    ],
+    "sponsors": [],
+    "ticket_price": [
+      {
+        "label": "Early Bird",
+        "price": "$99"
+      },
+      {
+        "label": "Standard",
+        "price": "$199"
+      }
+    ],
+    "is_paid": true,
+    "themes": []
+  }
+]

@@ -1,0 +1,204 @@
+[
+  {
+    "name": "HP & NVIDIA Developer Challenge",
+    "url": "https://hpaistudio.devpost.com/?ref_feature=challenge&ref_medium=discover",
+    "source": "devpost",
+    "remote": true,
+    "city": null,
+    "short_description": "Transform Industries Through AI - Build, Innovate, Deploy with HP AI Studio and NVIDIA.",
+    "prizes": [
+      "$70,000 in cash"
+    ],
+    "sponsors": [
+      "HP",
+      "NVIDIA"
+    ],
+    "judges": [],
+    "start_date": null,
+    "end_date": "2025-06-09",
+    "registration_deadline": "2025-06-09",
+    "themes": [
+      "Machine Learning/AI",
+      "Enterprise",
+      "Open Ended"
+    ],
+    "scraping_method": "firecrawl",
+    "format": null
+  },
+  {
+    "name": "GenAI Hackathon by Impetus & AWS",
+    "url": "https://impetusawsgenaihackathon.devpost.com/?ref_feature=challenge&ref_medium=discover",
+    "source": "devpost",
+    "remote": true,
+    "city": null,
+    "short_description": "Join the world’s most innovative and challenging GenAI hackathon—powered by Impetus and AWS.",
+    "prizes": [
+      "$10,000 in cash for 1st Prize",
+      "$2,000 in cash for 2nd Prize",
+      "$1,000 in cash for 3rd Prize"
+    ],
+    "sponsors": [
+      "Impetus Technologies Inc.",
+      "Amazon Web Services"
+    ],
+    "judges": [
+      {
+        "name": "Raghvendra Singh",
+        "company": "Impetus",
+        "title": "Senior Solutions Architect"
+      },
+      {
+        "name": "Sujit Singh",
+        "company": "AWS",
+        "title": "Partner Solutions Architect"
+      },
+      {
+        "name": "Josh Demuth",
+        "company": "AWS",
+        "title": "Sr GenAI Specialist SA"
+      },
+      {
+        "name": "Gitika Vijh",
+        "company": "AWS",
+        "title": "Sr. Partner Solutions Architect - Data & Analytics"
+      },
+      {
+        "name": "Vivek Gupta",
+        "company": "Impetus",
+        "title": "Data Scientist"
+      },
+      {
+        "name": "Ravishankar Rao Vallabhajosyula",
+        "company": "Impetus",
+        "title": "Senior Director, Data Science"
+      },
+      {
+        "name": "Dmitrii Timoshenko",
+        "company": "AWS",
+        "title": "Applied Scientist – Data: Science and Engineering"
+      },
+      {
+        "name": "Anand Sourabh",
+        "company": "Marsh & McLennan Companies",
+        "title": "VP Application Development"
+      }
+    ],
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": "2025-07-10",
+    "themes": [
+      "Enterprise",
+      "DevOps",
+      "Machine Learning/AI"
+    ],
+    "scraping_method": "firecrawl",
+    "format": null
+  },
+  {
+    "name": "Adobe Express Add-ons Hackathon",
+    "url": "https://adobeexpress.devpost.com/?ref_feature=challenge&ref_medium=discover",
+    "source": "devpost",
+    "remote": true,
+    "city": null,
+    "short_description": "An exciting opportunity for developers, designers, and creative builders to bring their idea to life and shape the future of Adobe Express.",
+    "prizes": [
+      "$30,000 in prizes",
+      "$5,000 Most valuable to Express users",
+      "$5,000 Best AI-enhanced experience",
+      "$5,000 Best integration or workflow hack",
+      "$5,000 Best new video innovation",
+      "$5,000 Collaboration Catalyst",
+      "$5,000 'Express Yourself' wildcard"
+    ],
+    "sponsors": [
+      "Adobe"
+    ],
+    "judges": [
+      {
+        "name": "Taylor Krusen",
+        "company": "Adobe",
+        "title": "Sr Developer Advocate"
+      },
+      {
+        "name": "Ruben Rincon giraldo",
+        "company": "Adobe",
+        "title": "Group Product Manager"
+      },
+      {
+        "name": "Steph Corrales",
+        "company": "Adobe",
+        "title": "Sr Experience Designer"
+      },
+      {
+        "name": "Holly Schinsky",
+        "company": "Adobe",
+        "title": "Sr DevRel Engineer"
+      },
+      {
+        "name": "Alex Castanheira",
+        "company": "Adobe",
+        "title": "Platform Partnership"
+      },
+      {
+        "name": "Gloria Wang",
+        "company": "Adobe",
+        "title": "Sr Software Engineer"
+      },
+      {
+        "name": "Tate Masi",
+        "company": "Adobe",
+        "title": "Sr Product Manager"
+      }
+    ],
+    "start_date": null,
+    "end_date": "2025-07-15",
+    "registration_deadline": "2025-07-15",
+    "themes": [
+      "Design",
+      "Machine Learning/AI",
+      "Web"
+    ],
+    "scraping_method": "firecrawl",
+    "format": null
+  },
+  {
+    "name": "Black Wings",
+    "url": "https://rewritingthecode.org/black-wings/",
+    "source": "mlh",
+    "remote": true,
+    "city": null,
+    "short_description": "The Black Wings group is for Black women in technology majors to share experiences and advice, have a familiar community within the tech industry, and gain support from having a group of women with shared interests.",
+    "prizes": [],
+    "sponsors": [],
+    "judges": [],
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "themes": [],
+    "scraping_method": "requests",
+    "format": null
+  },
+  {
+    "name": "IBM TechXchange Dev Day: AI and Automation Unpacked + Hackathon",
+    "url": "https://www.hackathon.com/event/ibm-techxchange-dev-day-ai-and-automation-unpacked-hackathon-683e113621d3916e2dd69794",
+    "source": "hackathon_com",
+    "remote": true,
+    "city": null,
+    "short_description": "Join IBM TechXchange Dev Day for a full day of technical content designed for developers, engineers, and data scientists, featuring expert-led sessions and hands-on demos.",
+    "prizes": [
+      "$10,000 prize pool"
+    ],
+    "sponsors": [],
+    "judges": [],
+    "start_date": "2025-06-25",
+    "end_date": "2025-06-29",
+    "registration_deadline": null,
+    "themes": [
+      "AI agents",
+      "automation",
+      "AI on IBM Z"
+    ],
+    "scraping_method": "requests",
+    "format": null
+  }
+]
