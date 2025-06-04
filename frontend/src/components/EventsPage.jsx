@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // Use environment variable for API URL, fallback to localhost for development
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://events-api-nprw.onrender.com';
 
 const EventsPage = () => {
   const [events, setEvents] = useState([]);
@@ -68,16 +68,16 @@ const EventsPage = () => {
 
   // Format date for display
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch {
-      return dateString;
+    if (!dateString) return 'Invalid Date';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) { // Check if date is valid
+      return 'Invalid Date';
     }
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   // Get status badge color
@@ -98,6 +98,25 @@ const EventsPage = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Helper function to get a sortable Date object, with fallback for invalid/missing dates
+  const getSortableDate = (dateString) => {
+    if (!dateString) {
+      return new Date('1900-01-01'); // Fallback for null, undefined, or empty string
+    }
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return new Date('1900-01-01'); // Fallback for invalid date strings
+    }
+    return date;
+  };
+
+  // Create a sorted version of filteredEvents before rendering
+  const sortedFilteredEvents = [...filteredEvents].sort((a, b) => {
+    const dateA = getSortableDate(a.start_date);
+    const dateB = getSortableDate(b.start_date);
+    return dateB.getTime() - dateA.getTime(); // Sort descending (most recent first)
+  });
 
   // Loading state
   if (loading) {
@@ -242,8 +261,13 @@ const EventsPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-gray-50">
+                {/*
+                  Note: Interactive column sorting (clicking headers) for dates 
+                  would require additional state and logic, or a table library.
+                  Currently, events are pre-sorted by start_date descending.
+                */}
+                {sortedFilteredEvents.map((event) => (
+                  <tr key={event.id || event.title} className="hover:bg-gray-50"> {/* Added fallback key */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{event.title}</div>
                     </td>
