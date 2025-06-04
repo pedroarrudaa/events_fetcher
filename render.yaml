@@ -20,8 +20,8 @@ services:
     env: node
     plan: free
     rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npx serve -s build
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npx serve -s build
     envVars:
       - key: NODE_VERSION
         value: 18
