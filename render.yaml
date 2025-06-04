@@ -9,5 +9,22 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: FRONTEND_URL
-        value: https://your-frontend-app.vercel.app
+        value: https://your-frontend-app.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: your-db-name
+          property: connectionString
+    autoDeploy: false
+  - type: web
+    name: events-dashboard-frontend
+    env: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s build
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: REACT_APP_API_URL
+        value: https://events-dashboard-be.onrender.com
     autoDeploy: false 
