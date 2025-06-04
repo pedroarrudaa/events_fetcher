@@ -27,4 +27,6 @@ services:
         value: 18
       - key: REACT_APP_API_URL
         value: https://events-dashboard-be.onrender.com
+      - key: PUBLIC_URL
+        value: "."
     autoDeploy: false 
