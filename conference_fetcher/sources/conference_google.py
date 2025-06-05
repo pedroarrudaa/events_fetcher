@@ -111,7 +111,10 @@ class ConferenceGoogleScraper:
                         'url': result.get('url', ''),
                         'title': result.get('title', ''),
                         'snippet': result.get('content', ''),
-                        'search_query': query
+                        'search_query': query,
+                        'discovery_method': 'tavily_search',
+                        'source_reliability': self._assess_source_reliability(result.get('url', '')),
+                        'query_type': self._classify_query_type(query)
                     }
                     all_results.append(conference_data)
                     
@@ -131,6 +134,52 @@ class ConferenceGoogleScraper:
         
         print(f"Total unique conference results found: {len(unique_results)}")
         return unique_results
+    
+    def _assess_source_reliability(self, url: str) -> float:
+        """Assess the reliability of a source URL."""
+        if not url:
+            return 0.3
+        
+        url_lower = url.lower()
+        
+        # High reliability domains
+        if any(domain in url_lower for domain in [
+            'ieee.org', 'acm.org', 'nips.cc', 'iclr.cc', 'openai.com',
+            'google.com', 'microsoft.com', 'nvidia.com', 'meta.com',
+            'conference.ai', 'eventbrite.com'
+        ]):
+            return 0.9
+        
+        # Good reliability domains
+        if any(domain in url_lower for domain in [
+            '.edu', '.gov', '.org', 'meetup.com', 'techevent',
+            'aiconference', 'machinelearning', 'deeplearning'
+        ]):
+            return 0.7
+        
+        # Medium reliability
+        if any(domain in url_lower for domain in [
+            '.ai', '.tech', 'conference', 'summit', 'workshop'
+        ]):
+            return 0.6
+        
+        # Lower reliability for general domains
+        return 0.4
+    
+    def _classify_query_type(self, query: str) -> str:
+        """Classify the type of search query."""
+        query_lower = query.lower()
+        
+        if 'site:' in query_lower:
+            return 'site_specific'
+        elif any(city in query_lower for city in ['san francisco', 'new york', 'boston', 'seattle']):
+            return 'location_specific'
+        elif 'virtual' in query_lower or 'remote' in query_lower:
+            return 'virtual_specific'
+        elif any(tech in query_lower for tech in ['ai', 'machine learning', 'deep learning', 'nlp']):
+            return 'technology_specific'
+        else:
+            return 'general'
     
     def extract_page_content(self, url: str) -> Dict[str, Any]:
         """
@@ -293,7 +342,9 @@ Web page content:
             return {
                 'url': url,
                 'error': content_result.get('error', 'Content extraction failed'),
-                'success': False
+                'success': False,
+                'quality_score': 0.0,
+                'data_completeness': 0.0
             }
         
         # Extract structured data using AI
@@ -302,11 +353,65 @@ Web page content:
             url
         )
         
+        # Calculate quality metrics
+        quality_score = self._calculate_quality_score(
+            conference_data, 
+            content_result.get('content', ''),
+            len(content_result.get('content', ''))
+        )
+        
+        data_completeness = self._calculate_data_completeness(conference_data)
+        
         # Add metadata
         conference_data['extraction_method'] = content_result['method']
         conference_data['success'] = True
+        conference_data['quality_score'] = quality_score
+        conference_data['data_completeness'] = data_completeness
         
         return conference_data
+    
+    def _calculate_quality_score(self, conference_data: Dict[str, Any], content: str, content_length: int) -> float:
+        """Calculate quality score based on content and extracted data."""
+        score = 0.0
+        
+        # Content length scoring (30% of total)
+        if content_length > 5000:
+            score += 0.3
+        elif content_length > 2000:
+            score += 0.2
+        elif content_length > 500:
+            score += 0.1
+        
+        # Data extraction scoring (40% of total)
+        important_fields = ['name', 'start_date', 'end_date', 'city', 'organizer']
+        filled_important = sum(1 for field in important_fields 
+                              if conference_data.get(field) and conference_data.get(field) != 'TBD')
+        score += (filled_important / len(important_fields)) * 0.4
+        
+        # Content quality indicators (30% of total)
+        if content:
+            content_lower = content.lower()
+            quality_indicators = [
+                'conference', 'summit', 'workshop', 'symposium',
+                'speaker', 'agenda', 'schedule', 'registration',
+                'date', 'location', 'venue', 'ticket'
+            ]
+            found_indicators = sum(1 for indicator in quality_indicators if indicator in content_lower)
+            score += min(0.3, (found_indicators / len(quality_indicators)) * 0.3)
+        
+        return min(1.0, score)
+    
+    def _calculate_data_completeness(self, conference_data: Dict[str, Any]) -> float:
+        """Calculate data completeness score."""
+        all_fields = ['name', 'is_remote', 'city', 'start_date', 'end_date', 'topics', 'sponsors', 'speakers', 'price', 'organizer']
+        
+        filled_fields = 0
+        for field in all_fields:
+            value = conference_data.get(field)
+            if value is not None and value != 'TBD' and value != [] and value != '':
+                filled_fields += 1
+        
+        return filled_fields / len(all_fields)
 
 
 def get_conference_urls(limit: int = 3, max_results_per_query: int = 2, queries_file: str = "queries.txt") -> List[Dict[str, Any]]:

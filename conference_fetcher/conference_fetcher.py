@@ -17,12 +17,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sources.conference_google import get_conference_urls as get_conference_urls_from_google
 from sources.conference_sites import get_conference_urls as get_conference_urls_from_sites
 # from sources.tavily_discovery import get_conferences_from_google  # Re-enabled with stricter limits # Temporarily commented out for module issue
-from database_utils import save_to_db, get_db_stats
+from database_utils import save_to_db, get_db_stats, save_collected_urls, get_urls_for_enrichment, mark_url_as_enriched
 from dotenv import load_dotenv
 from event_filters import filter_future_target_events, EventFilter
 from conference_fetcher.enrichers.gpt_extractor import GPTExtractor, enrich_conference_data
 from conference_fetcher.sources.conference_sites import get_conference_events
-from gpt_validation import validate_events_batch
+# from gpt_validation import validate_events_batch  # Removed - module was deleted
 
 # Load environment variables
 load_dotenv()
@@ -38,6 +38,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Simple replacement for validate_events_batch
+def validate_events_batch(events, event_type):
+    """Simple pass-through validation function."""
+    return events, []  # Return all events as validated, empty rejected list
 
 class ConferenceFetcher:
     """Main class for orchestrating conference data collection from multiple sources."""
@@ -646,14 +651,15 @@ class ConferenceFetcher:
         
         return filtered
     
-    def run(self, limit_per_source: int = 2, max_results_per_query: int = 2, queries_file: str = "queries.txt"):
+    def run(self, limit_per_source: int = 2, max_results_per_query: int = 2, queries_file: str = "queries.txt", force_reenrich: bool = False):
         """
-        Run the complete conference fetching pipeline with multiple sources.
+        Run the complete conference fetching pipeline with URL tracking and enrichment management.
         
         Args:
             limit_per_source: Maximum number of conferences to fetch from each source
             max_results_per_query: Maximum results per search query
             queries_file: Path to queries file
+            force_reenrich: If True, force re-enrichment of 1-3 already processed URLs for testing
         """
         global firecrawl_calls, test_mode
         
@@ -662,8 +668,12 @@ class ConferenceFetcher:
         if test_mode:
             print("🧪 Test mode is ON: pipeline will be limited to 1 event")
         
+        if force_reenrich:
+            print("🔄 Force re-enrichment mode is ON: will re-process 1-3 already enriched URLs")
+
         try:
-            # Fetch conferences from all sources
+            # Step 1: Fetch conferences from all sources
+            print("\n📡 Step 1: Fetching conferences from all sources...")
             conferences = self.fetch_conferences(
                 limit_per_source=limit_per_source,
                 max_results_per_query=max_results_per_query,
@@ -700,6 +710,10 @@ class ConferenceFetcher:
                     print(f"   🌐 Remote conferences: {db_stats['conferences']['remote']}")
                     print(f"   🏢 In-person conferences: {db_stats['conferences']['in_person']}")
                     print(f"   📅 Added in last 24h: {db_stats['conferences']['recent_24h']}")
+                    if 'collected_urls' in db_stats:
+                        print(f"   🔗 Total collected URLs: {db_stats['collected_urls']['overall']['total']}")
+                        print(f"   ✅ Enriched URLs: {db_stats['collected_urls']['overall']['enriched']}")
+                        print(f"   ⏳ Pending enrichment: {db_stats['collected_urls']['overall']['pending']}")
                 except Exception as db_error:
                     print(f"   ⚠️ Could not retrieve database stats: {db_error}")
                 
@@ -707,44 +721,180 @@ class ConferenceFetcher:
 
             print(f"✅ Total conferences collected from all sources: {len(conferences)}")
             
-            # Initialize variables for summary (in case of errors)
-            filtered_urls = conferences
-            deduped_conferences = conferences
-            enriched_conferences = conferences
-            quality_filtered = conferences
-            
-            # Filter out obviously non-conference URLs
+            # Step 2: Save collected URLs to database
+            print("\n💾 Step 2: Saving collected URLs to database...")
             try:
-                filtered_urls = self.filter_conference_urls(conferences)
+                url_save_results = save_collected_urls(conferences, 'conference')
+                print(f"📊 URL collection results: {url_save_results}")
+            except Exception as url_save_error:
+                print(f"⚠️ Error saving URLs to database: {url_save_error}")
+                print("   • Continuing with enrichment process...")
+            
+            # Step 3: Get URLs that need enrichment (or force re-enrichment)
+            print("\n🔍 Step 3: Identifying URLs that need enrichment...")
+            try:
+                if force_reenrich:
+                    # Force re-enrichment mode: get a few already enriched URLs
+                    print("🔄 Force re-enrichment mode: selecting already enriched URLs...")
+                    from database_utils import get_db_session, CollectedUrls
+                    
+                    session = get_db_session()
+                    try:
+                        # Get 1-3 already enriched conference URLs for testing
+                        enriched_urls = session.query(CollectedUrls).filter(
+                            CollectedUrls.source_type == 'conference',
+                            CollectedUrls.is_enriched == True
+                        ).limit(3).all()
+                        
+                        urls_to_enrich = []
+                        for url_record in enriched_urls:
+                            url_data = {
+                                'url': url_record.url,
+                                'source_type': url_record.source_type,
+                                'is_enriched': url_record.is_enriched,
+                                'timestamp_collected': url_record.timestamp_collected.isoformat() if url_record.timestamp_collected else None,
+                                'url_metadata': url_record.url_metadata or {}
+                            }
+                            # Merge metadata if it exists
+                            if url_record.url_metadata:
+                                url_data.update(url_record.url_metadata)
+                            urls_to_enrich.append(url_data)
+                        
+                        print(f"🔄 Selected {len(urls_to_enrich)} URLs for forced re-enrichment:")
+                        for i, url_data in enumerate(urls_to_enrich, 1):
+                            print(f"   {i}. {url_data['url']}")
+                            
+                    finally:
+                        session.close()
+                        
+                else:
+                    # Normal mode: get URLs that need enrichment
+                    urls_to_enrich = get_urls_for_enrichment('conference', limit=None)
+                
+                if not urls_to_enrich:
+                    if force_reenrich:
+                        print("❌ No URLs found for forced re-enrichment!")
+                    else:
+                        print("✅ All collected URLs have already been enriched!")
+                        print("   • No new enrichment needed")
+                    
+                    # Still show current database stats
+                    try:
+                        db_stats = get_db_stats()
+                        print(f"\n📊 Current Database Statistics:")
+                        print(f"   🗄️ Total conferences in DB: {db_stats['conferences']['total']}")
+                        print(f"   🔗 Total collected URLs: {db_stats['collected_urls']['overall']['total']}")
+                        print(f"   ✅ Enriched URLs: {db_stats['collected_urls']['overall']['enriched']}")
+                        print(f"   📈 Enrichment rate: {db_stats['collected_urls']['overall']['enrichment_rate']:.1f}%")
+                    except Exception as db_error:
+                        print(f"   ⚠️ Could not retrieve database stats: {db_error}")
+                    
+                    if not force_reenrich:
+                        return
+                
+                print(f"📋 Found {len(urls_to_enrich)} URLs {'for forced re-enrichment' if force_reenrich else 'needing enrichment'}")
+                
+                # In test mode, limit to 1 URL for enrichment
+                if test_mode and len(urls_to_enrich) > 1:
+                    urls_to_enrich = urls_to_enrich[:1]
+                    print(f"🧪 Test mode: Limited to {len(urls_to_enrich)} URL for enrichment")
+                
+            except Exception as enrichment_check_error:
+                print(f"⚠️ Error checking URLs for enrichment: {enrichment_check_error}")
+                print("   • Falling back to enriching all collected URLs...")
+                urls_to_enrich = conferences
+            
+            # Initialize variables for summary (in case of errors)
+            filtered_urls = urls_to_enrich
+            deduped_conferences = urls_to_enrich
+            enriched_conferences = urls_to_enrich
+            quality_filtered = urls_to_enrich
+            
+            # Step 4: Filter out obviously non-conference URLs
+            print("\n🔧 Step 4: Filtering non-conference URLs...")
+            try:
+                filtered_urls = self.filter_conference_urls(urls_to_enrich)
+                print(f"📊 URLs after filtering: {len(filtered_urls)}")
             except Exception as filter_error:
                 print(f"⚠️ Error filtering URLs: {filter_error}")
-                filtered_urls = conferences  # Use original data without filtering
+                filtered_urls = urls_to_enrich  # Use original data without filtering
             
-            # Deduplicate conferences
+            # Step 5: Deduplicate conferences
+            print("\n🔄 Step 5: Deduplicating conferences...")
             try:
                 deduped_conferences = self.deduplicate_conferences(filtered_urls)
+                print(f"📊 URLs after deduplication: {len(deduped_conferences)}")
             except Exception as dedup_error:
                 print(f"⚠️ Error deduplicating: {dedup_error}")
                 deduped_conferences = filtered_urls  # Use filtered data without deduplication
             
-            # Enrich conferences with detailed information using GPT
-            print("\n🔍 Enriching conference data with GPT...")
+            # Step 6: Enrich conferences with detailed information using GPT
+            print("\n🔍 Step 6: Enriching conference data with GPT...")
+            enrichment_results = {'enriched': 0, 'failed': 0, 'skipped': 0}
             try:
-                enriched_conferences = enrich_conference_data(deduped_conferences)
+                enriched_conferences = []
+                for conference in deduped_conferences:
+                    url = conference.get('url')
+                    if not url:
+                        print(f"⚠️ Skipping conference without URL: {conference}")
+                        enrichment_results['skipped'] += 1
+                        continue
+                    
+                    print(f"🔍 Enriching: {url}")
+                    
+                    try:
+                        # Enrich this single conference (with force_reenrich parameter)
+                        single_enriched = enrich_conference_data([conference], force_reenrich=force_reenrich)
+                        
+                        if single_enriched and len(single_enriched) > 0:
+                            enriched_conferences.extend(single_enriched)
+                            enrichment_results['enriched'] += 1
+                            print(f"✅ Successfully enriched: {url}")
+                        else:
+                            enriched_conferences.append(conference)
+                            enrichment_results['failed'] += 1
+                            print(f"❌ Failed to enrich: {url}")
+                    
+                    except Exception as single_enrichment_error:
+                        print(f"❌ Error enriching {url}: {single_enrichment_error}")
+                        enriched_conferences.append(conference)
+                        enrichment_results['failed'] += 1
+                    
+                    finally:
+                        # Always mark URL as enriched (even if enrichment failed)
+                        # This prevents repeated failed attempts
+                        try:
+                            mark_url_as_enriched(url)
+                        except Exception as mark_error:
+                            print(f"⚠️ Error marking URL as enriched: {mark_error}")
+                
+                print(f"📊 Enrichment results: {enrichment_results}")
+                
             except Exception as enrichment_error:
                 print(f"⚠️ Error during enrichment: {enrichment_error}")
                 enriched_conferences = deduped_conferences  # Use deduped data without enrichment
+                # Still mark URLs as enriched to avoid re-attempting
+                for conference in deduped_conferences:
+                    url = conference.get('url')
+                    if url:
+                        try:
+                            mark_url_as_enriched(url)
+                        except:
+                            pass
             
-            # Post-enrichment quality filtering (remove obvious non-conferences)
+            # Step 7: Post-enrichment quality filtering (remove obvious non-conferences)
+            print("\n🎯 Step 7: Post-enrichment quality filtering...")
             try:
                 quality_filtered = self.filter_non_conferences_post_enrichment(enriched_conferences)
+                print(f"📊 Events after quality filtering: {len(quality_filtered)}")
             except Exception as quality_error:
                 logger.warning(f"⚠️ Error in post-enrichment filtering: {quality_error}")
                 quality_filtered = enriched_conferences  # Use enriched data without quality filtering
             
-            # Apply enhanced filtering: future events in target locations only
-            logger.info("\n🎯 Applying enhanced filtering (future events + target locations)...")
+            # Step 8: Apply enhanced filtering: future events in target locations only
+            print("\n🎯 Step 8: Applying enhanced filtering (future events + target locations)...")
             filtered_conferences = filter_future_target_events(quality_filtered, "conference")
+            print(f"📊 Final events after location/date filtering: {len(filtered_conferences)}")
             
             if not filtered_conferences:
                 logger.error("❌ No conferences remained after enhanced filtering!")
@@ -764,8 +914,8 @@ class ConferenceFetcher:
                 
                 return
             
-            # Run GPT validation to ensure quality
-            print("🤖 Running GPT validation to ensure data quality...")
+            # Step 9: Run GPT validation to ensure quality
+            print("\n🤖 Step 9: Running GPT validation to ensure data quality...")
             # **TEMPORARILY DISABLED: GPT validation is being too strict**
             # validated_conferences = run_gpt_validation(filtered_conferences, 'conference')
             # print(f"✅ GPT approved {len(validated_conferences)} legitimate conferences")
@@ -784,7 +934,30 @@ class ConferenceFetcher:
             for conference in cleaned_conferences:
                 conference.pop("extraction_success", None)
             
-            # Save to files with error handling
+            # **NEW: Filter out remote conferences before saving to database**
+            print("\n🌐 Step 10: Filtering remote conferences for database storage...")
+            non_remote_conferences = []
+            remote_conferences = []
+            
+            for conference in cleaned_conferences:
+                is_remote = conference.get('remote', False)
+                if is_remote is True:
+                    remote_conferences.append(conference)
+                else:
+                    non_remote_conferences.append(conference)
+            
+            print(f"📊 Conference breakdown for database:")
+            print(f"   🏢 In-person/Hybrid conferences (will be saved to DB): {len(non_remote_conferences)}")
+            print(f"   🌐 Remote conferences (excluded from DB): {len(remote_conferences)}")
+            
+            if remote_conferences:
+                print(f"🚫 Remote conferences excluded from database:")
+                for conf in remote_conferences:
+                    conf_name = conf.get('name', 'Unknown')
+                    conf_url = conf.get('url', 'No URL')
+                    print(f"   • {conf_name} - {conf_url}")
+
+            # Save to files with error handling (save ALL conferences including remote)
             csv_path = None
             json_path = None
             
@@ -798,10 +971,15 @@ class ConferenceFetcher:
             except Exception as json_error:
                 print(f"⚠️ Failed to save JSON: {json_error}")
             
-            # Save to database with error handling
+            # Save to database with error handling (save only NON-REMOTE conferences)
             db_results = None
             try:
-                db_results = save_to_db(cleaned_conferences, table_name='conferences', update_existing=True)
+                if non_remote_conferences:
+                    db_results = save_to_db(non_remote_conferences, table_name='conferences', update_existing=True)
+                    print(f"✅ Saved {len(non_remote_conferences)} non-remote conferences to database")
+                else:
+                    print("ℹ️ No non-remote conferences to save to database")
+                    db_results = {'inserted': 0, 'updated': 0, 'skipped': 0, 'errors': 0}
             except Exception as db_error:
                 print(f"⚠️ Failed to save to database: {db_error}")
                 print("   • Check if DATABASE_URL is properly set")
@@ -819,6 +997,10 @@ class ConferenceFetcher:
                 print(f"   📊 After quality filtering: {len(quality_filtered)}")
                 print(f"   📊 After location filtering: {len(filtered_conferences)}")
                 print(f"   ✅ Successfully enriched: {enriched_count}/{len(filtered_conferences)}")
+                print(f"")
+                print(f"   💾 File output: {len(cleaned_conferences)} conferences (all including remote)")
+                print(f"   🗄️ Database output: {len(non_remote_conferences)} conferences (non-remote only)")
+                print(f"   🚫 Remote conferences excluded from DB: {len(remote_conferences)}")
                 
                 # Show source breakdown
                 if summary.get('source_breakdown'):
@@ -871,23 +1053,21 @@ class ConferenceFetcher:
             except Exception as db_stats_error:
                 print(f"⚠️ Could not retrieve database statistics: {db_stats_error}")
             
-        except Exception as e:
-            print(f"💥 Error during execution: {str(e)}")
-            print(f"\n🔧 This error might be due to:")
-            print(f"   • API rate limits (Firecrawl, Tavily, OpenAI)")
-            print(f"   • Network connectivity issues")
-            print(f"   • Missing environment variables (API keys)")
-            print(f"   • Database connection problems")
-            print(f"\n🎯 Suggested actions:")
-            print(f"   • Wait a few minutes and try again")
-            print(f"   • Check your .env file for missing API keys")
-            print(f"   • Reduce limit_per_source and max_results_per_query")
-            print(f"   • Check network connectivity")
+        except Exception as pipeline_error:
+            print(f"💥 Pipeline error: {pipeline_error}")
+            logger.error(f"Conference fetcher pipeline failed: {pipeline_error}")
             
-            # Firecrawl usage summary even on error
-            print(f"\n🔥 [Firecrawl Usage] Total API calls this run: {firecrawl_calls}")
-            if test_mode:
-                print("🧪 Test mode was ON: pipeline limited to 1 event")
+            # Show database stats even if pipeline failed
+            try:
+                db_stats = get_db_stats()
+                print(f"\n📊 Current Database Statistics:")
+                print(f"   🗄️ Total conferences in DB: {db_stats['conferences']['total']}")
+                if 'collected_urls' in db_stats:
+                    print(f"   🔗 Total collected URLs: {db_stats['collected_urls']['overall']['total']}")
+                    print(f"   ✅ Enriched URLs: {db_stats['collected_urls']['overall']['enriched']}")
+                    print(f"   ⏳ Pending enrichment: {db_stats['collected_urls']['overall']['pending']}")
+            except Exception as db_error:
+                print(f"   ⚠️ Could not retrieve database stats: {db_error}")
             
             raise
 
@@ -900,9 +1080,10 @@ def main():
         
         # Run with conservative settings to save API credits and avoid bans
         fetcher.run(
-            limit_per_source=25,           # Increased from 10 to get more conferences per source  
-            max_results_per_query=10,      # Increased from 5 for more results per search query
-            queries_file="queries.txt"     # Custom search queries
+            limit_per_source=3,            # Changed from 25 to 3 to get ~12 conferences total
+            max_results_per_query=2,       # Kept at 2 for conservative API usage
+            queries_file="queries.txt",     # Custom search queries
+            force_reenrich=False           # **TESTING COMPLETE** - returned to False
         )
         
     except Exception as e:

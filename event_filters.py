@@ -236,8 +236,30 @@ class EventFilter:
         **IMPROVEMENT 3: Enhanced data quality check with better logging for rejection reasons**
         Check if an event has sufficient data quality.
         Enhanced with better checks for organizers, sponsors, judges.
+        More lenient for virtual/remote events.
         """
         missing_fields = []
+        
+        # Check if this is a virtual/remote event first
+        is_virtual = False
+        location_texts = []
+        
+        # Collect location information to check if virtual
+        city = (event.get('city') or '').strip().lower()
+        location = (event.get('location') or '').strip().lower()
+        modality = (event.get('modality') or '').strip().lower()
+        if event.get('remote') is True:
+            is_virtual = True
+        elif any(keyword in ' '.join([city, location, modality]) for keyword in ['virtual', 'online', 'remote']):
+            is_virtual = True
+        
+        # **LENIENT FOR VIRTUAL EVENTS**: Virtual events often have less formal structure
+        if is_virtual:
+            # For virtual events, be much more lenient - just check if we have a meaningful name and URL
+            name = event.get('name', '')
+            url = event.get('url', '')
+            if len(name.strip()) >= 4 and url.strip():
+                return True, "virtual event with basic info (lenient check)"
         
         # For hackathons, check for organizers/sponsors/judges
         if event.get('source') in ['devpost', 'mlh', 'hackerearth', 'hackathon_com']:

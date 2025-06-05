@@ -1,0 +1,246 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conference Mini Report</title>
+    <style>
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 500;
+        }
+        
+        .conference-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .conference-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .conference-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .conference-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .conference-url {
+            color: #3498db;
+            text-decoration: none;
+            word-break: break-all;
+            font-size: 0.9em;
+            display: block;
+            margin-bottom: 15px;
+        }
+        
+        .conference-url:hover {
+            text-decoration: underline;
+        }
+        
+        .conference-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        
+        .meta-label {
+            font-weight: 600;
+            color: #34495e;
+            margin-right: 8px;
+        }
+        
+        .meta-value {
+            color: #7f8c8d;
+        }
+        
+        .conference-description {
+            color: #555;
+            line-height: 1.5;
+            font-size: 0.95em;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        
+        .themes {
+            margin: 15px 0;
+        }
+        
+        .theme-tag {
+            display: inline-block;
+            background: #9b59b6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin: 2px;
+        }
+        
+        .tag {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin: 2px;
+        }
+        
+        .tag.remote {
+            background: #27ae60;
+        }
+        
+        .tag.location {
+            background: #f39c12;
+        }
+        
+        .tag.source {
+            background: #34495e;
+        }
+        
+        .tag.registration {
+            background: #e67e22;
+        }
+        
+        .no-conferences {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .no-conferences h2 {
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            border-top: 1px solid #ecf0f1;
+            margin-top: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .conference-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .conference-meta {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Conference Mini Report</h1>
+            <p class="subtitle">Generated on 2025-06-05 14:42:50</p>
+            <div class="stats">
+                <span class="stat">📊 Total Conferences: 0</span>
+                <span class="stat">🌐 Sources: 0</span>
+                <span class="stat">📍 Locations: 0</span>
+                <span class="stat">🏷️ Themes: 0</span>
+            </div>
+        </header>
+        
+        <main>
+            
+            <div class="no-conferences">
+                <h2>🤷‍♂️ No Conferences Found</h2>
+                <p>The pipeline didn't find any conferences matching the criteria.</p>
+            </div>
+            
+        </main>
+        
+        <footer>
+            <p>Generated by Conference Mini Pipeline</p>
+        </footer>
+    </div>
+</body>
+</html>

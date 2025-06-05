@@ -19,6 +19,16 @@ load_dotenv()
 # SQLAlchemy setup
 Base = declarative_base()
 
+class CollectedUrls(Base):
+    """SQLAlchemy model for tracking collected URLs and their enrichment status."""
+    __tablename__ = 'collected_urls'
+    
+    url = Column(String, primary_key=True, unique=True, nullable=False)
+    source_type = Column(String, nullable=False)  # 'hackathon' or 'conference'
+    is_enriched = Column(Boolean, default=False, nullable=False)
+    timestamp_collected = Column(DateTime, default=datetime.utcnow, nullable=False)
+    url_metadata = Column(JSON)  # Optional JSON metadata like page title, raw scraping data
+
 class Hackathon(Base):
     """SQLAlchemy model for hackathons table."""
     __tablename__ = 'hackathons'
@@ -64,6 +74,18 @@ class Conference(Base):
     themes = Column(JSON)
     source = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    registration_url = Column(String)
+    registration_deadline = Column(String)
+
+class EventActions(Base):
+    """SQLAlchemy model for tracking manual actions on events."""
+    __tablename__ = 'event_actions'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id = Column(UUID(as_uuid=True), nullable=False)
+    event_type = Column(String, nullable=False)  # 'hackathon' or 'conference'
+    action = Column(String, nullable=False)  # 'archive' or 'reached_out'
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 # Database engine and session
 _engine = None
@@ -103,12 +125,12 @@ def get_db_session():
 
 def create_tables() -> None:
     """
-    Create the hackathons and conferences tables if they don't exist.
+    Create the hackathons, conferences, collected_urls, and event_actions tables if they don't exist.
     """
     try:
         engine = get_db_engine()
         Base.metadata.create_all(engine)
-        print(f"✅ Database tables 'hackathons' and 'conferences' created/verified in PostgreSQL")
+        print(f"✅ Database tables 'hackathons', 'conferences', 'collected_urls', and 'event_actions' created/verified in PostgreSQL")
     except Exception as e:
         print(f"❌ Error creating tables: {str(e)}")
         raise
@@ -406,6 +428,10 @@ def get_db_stats() -> Dict[str, Any]:
                 source_stats[f"conferences_{source}"] = count
         
         stats['sources'] = source_stats
+        
+        # Add collected URLs statistics
+        stats['collected_urls'] = get_collected_urls_stats()
+        
         stats['database'] = 'Railway PostgreSQL (SQLAlchemy)'
         
         return stats
@@ -416,7 +442,364 @@ def get_db_stats() -> Dict[str, Any]:
             'hackathons': {'total': 0, 'remote': 0, 'in_person': 0, 'recent_24h': 0},
             'conferences': {'total': 0, 'remote': 0, 'in_person': 0, 'recent_24h': 0},
             'sources': {},
+            'collected_urls': {'overall': {'total': 0, 'enriched': 0, 'pending': 0, 'recent_24h': 0, 'enrichment_rate': 0}},
             'database': 'Railway PostgreSQL (SQLAlchemy) - Error'
         }
+    finally:
+        session.close()
+
+def save_collected_urls(urls_data: List[Dict[str, Any]], source_type: str) -> Dict[str, int]:
+    """
+    Save collected URLs to the collected_urls table.
+    
+    Args:
+        urls_data: List of dictionaries containing URL data
+        source_type: Type of source ('hackathon' or 'conference')
+        
+    Returns:
+        Dictionary with counts: {'inserted': int, 'updated': int, 'skipped': int, 'errors': int}
+    """
+    if not urls_data:
+        print("❌ No URLs to save!")
+        return {'inserted': 0, 'updated': 0, 'skipped': 0, 'errors': 0}
+    
+    if source_type not in ['hackathon', 'conference']:
+        raise ValueError("source_type must be either 'hackathon' or 'conference'")
+    
+    # Ensure tables exist
+    create_tables()
+    
+    session = get_db_session()
+    counts = {'inserted': 0, 'updated': 0, 'skipped': 0, 'errors': 0}
+    
+    print(f"💾 Saving {len(urls_data)} URLs to collected_urls table...")
+    print(f"🏷️ Source type: {source_type}")
+    
+    try:
+        for url_data in urls_data:
+            try:
+                url = url_data.get('url')
+                if not url:
+                    print(f"⚠️ Skipping URL data without URL field: {url_data}")
+                    counts['errors'] += 1
+                    continue
+                
+                # Prepare metadata (exclude 'url' field to avoid duplication)
+                metadata = {k: v for k, v in url_data.items() if k != 'url'}
+                
+                # Check if URL already exists
+                existing = session.query(CollectedUrls).filter_by(url=url).first()
+                
+                if existing:
+                    # Update metadata if provided and different
+                    if metadata and existing.url_metadata != metadata:
+                        existing.url_metadata = metadata
+                        existing.timestamp_collected = datetime.utcnow()
+                        counts['updated'] += 1
+                        print(f"📝 Updated URL: {url}")
+                    else:
+                        counts['skipped'] += 1
+                        print(f"⏩ Skipped existing URL: {url}")
+                else:
+                    # Insert new URL
+                    new_url = CollectedUrls(
+                        url=url,
+                        source_type=source_type,
+                        is_enriched=False,
+                        timestamp_collected=datetime.utcnow(),
+                        url_metadata=metadata if metadata else None
+                    )
+                    session.add(new_url)
+                    counts['inserted'] += 1
+                    print(f"✅ Added new URL: {url}")
+                
+            except Exception as e:
+                print(f"❌ Error saving URL {url_data.get('url', 'Unknown')}: {str(e)}")
+                counts['errors'] += 1
+                continue
+        
+        # Commit all changes
+        session.commit()
+        
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Database transaction failed: {str(e)}")
+        raise
+    finally:
+        session.close()
+    
+    # Print summary
+    print(f"✅ URL collection save complete:")
+    print(f"   • Source type: {source_type}")
+    print(f"   • Inserted: {counts['inserted']}")
+    print(f"   • Updated: {counts['updated']}")
+    print(f"   • Skipped: {counts['skipped']}")
+    print(f"   • Errors: {counts['errors']}")
+    
+    return counts
+
+def get_urls_for_enrichment(source_type: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Get URLs that need enrichment (is_enriched=False).
+    
+    Args:
+        source_type: Type of source ('hackathon' or 'conference')
+        limit: Optional limit on number of URLs to return
+        
+    Returns:
+        List of URL dictionaries that need enrichment
+    """
+    if source_type not in ['hackathon', 'conference']:
+        raise ValueError("source_type must be either 'hackathon' or 'conference'")
+    
+    session = get_db_session()
+    
+    try:
+        query = session.query(CollectedUrls).filter(
+            CollectedUrls.source_type == source_type,
+            CollectedUrls.is_enriched == False
+        ).order_by(CollectedUrls.timestamp_collected.asc())
+        
+        if limit:
+            query = query.limit(limit)
+        
+        results = query.all()
+        
+        # Convert to list of dictionaries
+        urls = []
+        for result in results:
+            url_data = {
+                'url': result.url,
+                'source_type': result.source_type,
+                'is_enriched': result.is_enriched,
+                'timestamp_collected': result.timestamp_collected.isoformat() if result.timestamp_collected else None,
+                'url_metadata': result.url_metadata
+            }
+            # If metadata exists, merge it into the main dictionary
+            if result.url_metadata:
+                url_data.update(result.url_metadata)
+            urls.append(url_data)
+        
+        print(f"📋 Found {len(urls)} URLs needing enrichment for {source_type}")
+        return urls
+        
+    finally:
+        session.close()
+
+def mark_url_as_enriched(url: str) -> bool:
+    """
+    Mark a URL as enriched (is_enriched=True).
+    
+    Args:
+        url: The URL to mark as enriched
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    session = get_db_session()
+    
+    try:
+        # Find the URL record
+        url_record = session.query(CollectedUrls).filter_by(url=url).first()
+        
+        if url_record:
+            url_record.is_enriched = True
+            session.commit()
+            print(f"✅ Marked URL as enriched: {url}")
+            return True
+        else:
+            print(f"⚠️ URL not found in collected_urls: {url}")
+            return False
+        
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Error marking URL as enriched: {str(e)}")
+        return False
+    finally:
+        session.close()
+
+def get_collected_urls_stats() -> Dict[str, Any]:
+    """
+    Get statistics about collected URLs.
+    
+    Returns:
+        Dictionary with collected URLs statistics
+    """
+    session = get_db_session()
+    
+    try:
+        stats = {}
+        
+        # Overall stats
+        total_urls = session.query(CollectedUrls).count()
+        enriched_urls = session.query(CollectedUrls).filter(CollectedUrls.is_enriched == True).count()
+        pending_urls = total_urls - enriched_urls
+        
+        # By source type
+        for source_type in ['hackathon', 'conference']:
+            total_source = session.query(CollectedUrls).filter(CollectedUrls.source_type == source_type).count()
+            enriched_source = session.query(CollectedUrls).filter(
+                CollectedUrls.source_type == source_type,
+                CollectedUrls.is_enriched == True
+            ).count()
+            pending_source = total_source - enriched_source
+            
+            stats[source_type] = {
+                'total': total_source,
+                'enriched': enriched_source,
+                'pending': pending_source,
+                'enrichment_rate': (enriched_source / total_source * 100) if total_source > 0 else 0
+            }
+        
+        # Recent collection stats (last 24 hours)
+        yesterday = datetime.utcnow() - timedelta(hours=24)
+        recent_urls = session.query(CollectedUrls).filter(CollectedUrls.timestamp_collected >= yesterday).count()
+        
+        stats['overall'] = {
+            'total': total_urls,
+            'enriched': enriched_urls,
+            'pending': pending_urls,
+            'recent_24h': recent_urls,
+            'enrichment_rate': (enriched_urls / total_urls * 100) if total_urls > 0 else 0
+        }
+        
+        return stats
+        
+    except Exception as e:
+        print(f"❌ Error getting collected URLs stats: {str(e)}")
+        return {
+            'overall': {'total': 0, 'enriched': 0, 'pending': 0, 'recent_24h': 0, 'enrichment_rate': 0},
+            'hackathon': {'total': 0, 'enriched': 0, 'pending': 0, 'enrichment_rate': 0},
+            'conference': {'total': 0, 'enriched': 0, 'pending': 0, 'enrichment_rate': 0}
+        }
+    finally:
+        session.close()
+
+def save_event_action(event_id: str, event_type: str, action: str) -> bool:
+    """
+    Save a manual action for an event.
+    
+    Args:
+        event_id: UUID of the event
+        event_type: Type of event ('hackathon' or 'conference')
+        action: Action taken ('archive' or 'reached_out')
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if event_type not in ['hackathon', 'conference']:
+        print(f"❌ Invalid event_type: {event_type}. Must be 'hackathon' or 'conference'")
+        return False
+    
+    if action not in ['archive', 'reached_out']:
+        print(f"❌ Invalid action: {action}. Must be 'archive' or 'reached_out'")
+        return False
+    
+    session = get_db_session()
+    
+    try:
+        # Validate that the event exists
+        if event_type == 'hackathon':
+            event_exists = session.query(Hackathon).filter_by(id=event_id).first()
+        else:
+            event_exists = session.query(Conference).filter_by(id=event_id).first()
+        
+        if not event_exists:
+            print(f"❌ Event not found: {event_id} ({event_type})")
+            return False
+        
+        # Create new action record
+        new_action = EventActions(
+            event_id=uuid.UUID(event_id),
+            event_type=event_type,
+            action=action,
+            timestamp=datetime.utcnow()
+        )
+        
+        session.add(new_action)
+        session.commit()
+        
+        print(f"✅ Saved action '{action}' for {event_type} {event_id}")
+        return True
+        
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Error saving event action: {str(e)}")
+        return False
+    finally:
+        session.close()
+
+def get_event_action(event_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get the latest action for an event.
+    
+    Args:
+        event_id: UUID of the event
+        
+    Returns:
+        Dictionary with action data or None if no action exists
+    """
+    session = get_db_session()
+    
+    try:
+        # Get the most recent action for this event
+        action = session.query(EventActions).filter_by(
+            event_id=uuid.UUID(event_id)
+        ).order_by(EventActions.timestamp.desc()).first()
+        
+        if action:
+            return {
+                'id': str(action.id),
+                'event_id': str(action.event_id),
+                'event_type': action.event_type,
+                'action': action.action,
+                'timestamp': action.timestamp.isoformat()
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f"❌ Error getting event action: {str(e)}")
+        return None
+    finally:
+        session.close()
+
+def get_event_actions_stats() -> Dict[str, Any]:
+    """
+    Get statistics about event actions.
+    
+    Returns:
+        Dictionary with event actions statistics
+    """
+    session = get_db_session()
+    
+    try:
+        stats = {}
+        
+        # Overall stats
+        total_actions = session.query(EventActions).count()
+        
+        # By action type
+        for action_type in ['archive', 'reached_out']:
+            count = session.query(EventActions).filter(EventActions.action == action_type).count()
+            stats[action_type] = count
+        
+        # By event type
+        for event_type in ['hackathon', 'conference']:
+            count = session.query(EventActions).filter(EventActions.event_type == event_type).count()
+            stats[f'{event_type}_actions'] = count
+        
+        # Recent actions (last 24 hours)
+        yesterday = datetime.utcnow() - timedelta(hours=24)
+        recent_actions = session.query(EventActions).filter(EventActions.timestamp >= yesterday).count()
+        
+        stats['total'] = total_actions
+        stats['recent_24h'] = recent_actions
+        
+        return stats
+        
+    except Exception as e:
+        print(f"❌ Error getting event actions stats: {str(e)}")
+        return {'total': 0, 'archive': 0, 'reached_out': 0, 'hackathon_actions': 0, 'conference_actions': 0, 'recent_24h': 0}
     finally:
         session.close() 

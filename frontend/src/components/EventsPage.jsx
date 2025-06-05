@@ -6,6 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://events-api-nprw.o
 const EventsPage = () => {
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
+  const [eventActions, setEventActions] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -30,6 +31,25 @@ const EventsPage = () => {
     return location;
   };
 
+  // Fetch event actions for a given event ID
+  const fetchEventAction = async (eventId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/event-action/${eventId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      } else if (response.status === 404) {
+        return null; // No action found
+      }
+      
+      return null;
+    } catch (err) {
+      console.error(`Error fetching action for event ${eventId}:`, err);
+      return null;
+    }
+  };
+
   // Fetch events from API
   const fetchEvents = async () => {
     try {
@@ -44,6 +64,21 @@ const EventsPage = () => {
       const data = await response.json();
       setEvents(data);
       setFilteredEvents(data);
+      
+      // Fetch actions for all events
+      const actionsMap = {};
+      await Promise.all(
+        data.map(async (event) => {
+          if (event.id) {
+            const action = await fetchEventAction(event.id);
+            if (action) {
+              actionsMap[event.id] = action;
+            }
+          }
+        })
+      );
+      setEventActions(actionsMap);
+      
     } catch (err) {
       console.error('Error fetching events:', err);
       setError(`Failed to fetch events: ${err.message}`);
@@ -89,6 +124,30 @@ const EventsPage = () => {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  // Format action timestamp for display
+  const formatActionTime = (timestamp) => {
+    if (!timestamp) return '—';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '—';
+    
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
+
+  // Get action badge color
+  const getActionColor = (action) => {
+    switch (action) {
+      case 'archive': return 'bg-red-100 text-red-800';
+      case 'reached_out': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Get type badge color
@@ -239,6 +298,12 @@ const EventsPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     URL
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Last Action
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action Time
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -272,6 +337,16 @@ const EventsPage = () => {
                           Visit
                         </a>
                       ) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {eventActions[event.id]?.action ? (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(eventActions[event.id].action)}`}>
+                          {eventActions[event.id].action}
+                        </span>
+                      ) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {eventActions[event.id]?.timestamp ? formatActionTime(eventActions[event.id].timestamp) : 'N/A'}
                     </td>
                   </tr>
                 ))}

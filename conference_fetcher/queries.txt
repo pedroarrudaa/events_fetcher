@@ -24,4 +24,53 @@ Deep Learning Summit 2025 New York
 Computer Vision conference 2025
 NLP conference 2025 remote
 Robotics AI conference 2025 SF
-AI healthcare conference 2025 NYC 
+AI healthcare conference 2025 NYC
+site:*.ai AI conference 2025 San Francisco
+site:*.org AI summit 2025 New York
+site:*.tech artificial intelligence conference 2025
+site:*.edu machine learning conference 2025
+site:eventbrite.com AI conference San Francisco 2025
+site:meetup.com artificial intelligence NYC 2025
+AI conference San Francisco 2025
+AI conference New York 2025
+AI conference virtual 2025
+Machine Learning conference San Francisco 2025
+Machine Learning conference New York 2025
+Deep Learning conference San Francisco 2025
+Deep Learning conference New York 2025
+Computer Vision conference San Francisco 2025
+Computer Vision conference New York 2025
+NLP conference San Francisco 2025
+NLP conference New York 2025
+Robotics conference San Francisco 2025
+Robotics conference New York 2025
+Data Science conference San Francisco 2025
+Data Science conference New York 2025
+MLOps conference San Francisco 2025
+MLOps conference New York 2025
+AI summit San Francisco 2025
+AI summit New York 2025
+AI workshop San Francisco 2025
+AI workshop New York 2025
+Artificial Intelligence symposium San Francisco 2025
+Artificial Intelligence symposium New York 2025
+Tech conference AI San Francisco 2025
+Tech conference AI New York 2025
+"AI Conference" San Francisco 2025
+"AI Conference" New York 2025
+"Machine Learning Conference" 2025
+"Deep Learning Summit" 2025
+"Computer Vision Conference" 2025
+"AI Summit" 2025 virtual
+"Data Science Conference" 2025
+"MLOps Conference" 2025
+site:*.ai "AI conference" 2025
+site:*.org "machine learning summit" 2025
+site:*.tech "artificial intelligence" conference 2025
+site:nvidia.com GTC 2025
+site:openai.com DevDay 2025
+site:google.com "I/O 2025"
+site:apple.com "WWDC 2025"
+site:meta.com "Connect 2025"
+site:microsoft.com "Build 2025"
+site:aws.amazon.com "re:Invent 2025" 

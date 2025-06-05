@@ -1,564 +1,150 @@
 [
   {
-    "name": "The AI Conference: Shaping the Future of AI San Francisco 2025",
-    "url": "https://www.vktr.com/events/conference/the-ai-conference-shaping-the-future-of-ai-san-francisco-2025/",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-09-17",
-    "end_date": "2025-09-18",
-    "topics": [
-      "Artificial General Intelligence (AGI)",
-      "Foundation Models and Large Language Models (LLMs)",
-      "Generative AI",
-      "Neural Architectures",
-      "AI Infrastructure"
-    ],
-    "sponsors": [],
-    "speakers": [
-      "Ben Lorica"
-    ],
-    "price": "TBD",
-    "organizer": "MLconf",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623962",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "The AI Conference",
-    "url": "https://aiconference.com/",
-    "is_remote": false,
-    "city": "SAN FRANCISCO",
-    "start_date": "2025-09-17",
-    "end_date": "2025-09-18",
-    "topics": [
-      "AGI",
-      "LLMs",
-      "Infrastructure",
-      "Alignment",
-      "AI Startups"
-    ],
-    "sponsors": [
-      "Forbes",
-      "Fast Company",
-      "Der Spiegel",
-      "Crunchbase",
-      "CNBC"
-    ],
-    "speakers": [
-      "Dr. Rodney Brooks",
-      "Michele Lee",
-      "Jai Malkani",
-      "Yiqi Zhao",
-      "Rohit Patel"
-    ],
-    "price": "TBD",
-    "organizer": "TBD",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623969",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "AI DevSummit",
-    "url": "https://aidevsummit.co/",
-    "is_remote": true,
-    "city": "South San Francisco, CA",
-    "start_date": "2025-05-28",
-    "end_date": "2025-06-05",
-    "topics": [
-      "Chatbots",
-      "Machine Learning",
-      "Open Source AI Libraries",
-      "AI for the Enterprise",
-      "Deep AI / Neural Networks"
-    ],
-    "sponsors": [
-      "Google",
-      "Toyota",
-      "Nebius",
-      "Scale AI",
-      "Hasura"
-    ],
-    "speakers": [
-      "Logan Ramalingam",
-      "Aaron Miller",
-      "Kordel France",
-      "Ravi Chandu Ummadisetti",
-      "David Campbell"
-    ],
-    "price": "TBD",
-    "organizer": "TBD",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623972",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Data + AI Summit",
-    "url": "https://www.databricks.com/dataaisummit",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [
-      "data",
-      "analytics",
-      "AI"
-    ],
-    "sponsors": [
-      "Databricks",
-      "JPMorgan Chase",
-      "Microsoft",
-      "Anthropic",
-      "Atlassian Pty Ltd."
-    ],
-    "speakers": [
-      "Ali Ghodsi",
-      "Jamie Dimon",
-      "Satya Nadella",
-      "Dario Amodei",
-      "Kasey Uhlenhuth"
-    ],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623975",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Snowflake Summit 2025",
-    "url": "https://www.snowflake.com/en/summit/",
-    "is_remote": true,
-    "city": "San Francisco",
-    "start_date": "2025-06-02",
-    "end_date": "2025-06-05",
-    "topics": [
-      "data",
-      "AI",
-      "applications",
-      "machine learning",
-      "data architectures"
-    ],
-    "sponsors": [
-      "Snowflake"
-    ],
-    "speakers": [
-      "Sam Altman",
-      "Sridhar Ramaswamy",
-      "Christian Kleinerman",
-      "Denise Persson"
-    ],
-    "price": "TBD",
-    "organizer": "Snowflake",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623978",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "AI Engineer World's Fair 2025",
-    "url": "https://www.ai.engineer/",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-03",
-    "end_date": "2025-06-05",
-    "topics": [
-      "AI",
-      "Engineering",
-      "Technology"
-    ],
-    "sponsors": [
-      "Microsoft",
-      "SmolAI"
-    ],
-    "speakers": [
-      "Eric Ryan",
-      "Dedy Kredo",
-      "Pedro Tabio",
-      "Eugene Yan",
-      "Yanick J. S."
-    ],
-    "price": "TBD",
-    "organizer": "AI Engineer",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623983",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "World Summit AI USA",
-    "url": "https://usa.worldsummit.ai/",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-18",
-    "end_date": "2025-06-19",
-    "topics": [
-      "AI",
-      "Technology",
-      "Innovation",
-      "Policy",
-      "Ethics"
-    ],
-    "sponsors": [],
-    "speakers": [
-      "Alex Iftimie",
-      "Gary Marcus",
-      "Nina Jankowicz",
-      "Ben Goertzel",
-      "Divya Chander"
-    ],
-    "price": "TBD",
-    "organizer": "TBD",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623986",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Databricks: Data + AI Summit San Francisco 2025",
-    "url": "https://www.vktr.com/events/conference/databricks-data-ai-summit-san-francisco-2025/",
-    "is_remote": true,
-    "city": "San Francisco",
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [
-      "Data Warehousing",
-      "Artificial Intelligence",
-      "Analytics and Business Intelligence",
-      "Data Strategy",
-      "Data and AI Governance"
-    ],
-    "sponsors": [
-      "Microsoft",
-      "Amazon Web Services (AWS)",
-      "Google Cloud",
-      "Intel",
-      "Snowflake"
-    ],
-    "speakers": [],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623989",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Data + AI Summit 2025",
-    "url": "https://moscone.com/events/data-ai-summit-2025",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [
-      "machine learning",
-      "data engineering",
-      "analytics",
-      "open-source technologies"
-    ],
-    "sponsors": [
-      "Databricks"
-    ],
-    "speakers": [],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623992",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Databricks Data + AI Summit 2025",
-    "url": "https://techedgeai.com/databricks-data-ai-summit-2025-full-agenda-key-speakers-announced/",
-    "is_remote": true,
-    "city": null,
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [
-      "generative AI",
-      "data governance"
-    ],
-    "sponsors": [
-      "AWS",
-      "Accenture",
-      "Deloitte",
-      "Google Cloud",
-      "Microsoft"
-    ],
+    "url": "https://neurips.cc/Conferences/2025",
+    "source_type": "conference",
+    "is_enriched": true,
+    "timestamp_collected": "2025-06-05T08:57:23.117262",
+    "url_metadata": {
+      "name": "NeurIPS 2025",
+      "start_date": null,
+      "end_date": null,
+      "city": "New Orleans, LA",
+      "remote": false,
+      "source": "neurips",
+      "fetched_at": "2025-06-05T10:57:16.774978",
+      "data_source": "conference_website_scrapers"
+    },
+    "name": "NeurIPS 2025",
+    "start_date": "2025-12-02",
+    "end_date": "2025-12-07",
+    "city": "San Diego",
+    "remote": false,
+    "source": "neurips",
+    "fetched_at": "2025-06-05T10:57:16.774978",
+    "data_source": "conference_website_scrapers",
+    "short_description": "The Thirty-Ninth Annual Conference on Neural Information Processing Systems.",
+    "registration_deadline": "2025-10-11",
     "speakers": [
       {
-        "name": "Ali Ghodsi",
-        "company": "Databricks",
-        "title": "Co-founder"
+        "name": "Marzyeh Ghassemi",
+        "company": "MIT",
+        "title": "None"
       },
       {
-        "name": "Matei Zaharia",
-        "company": "Databricks",
-        "title": "Co-founder"
-      },
-      {
-        "name": "Reynold Xin",
-        "company": "Databricks",
-        "title": "Co-founder"
-      },
-      {
-        "name": "Jamie Dimon",
-        "company": "JPMorgan Chase",
-        "title": "Chairman and CEO"
-      },
-      {
-        "name": "Dario Amodei",
-        "company": "Anthropic",
-        "title": "Co-founder and CEO"
-      },
-      {
-        "name": "Satya Nadella",
-        "company": "Microsoft",
-        "title": "Chairman and CEO (pre-recorded fireside chat)"
+        "name": "Razvan Pascanu",
+        "company": "Google DeepMind",
+        "title": "None"
       }
     ],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623995",
-    "data_source": "conference_google_search",
-    "remote": true,
-    "short_description": "The event brings together 20,000+ data and AI professionals worldwide to explore the latest in generative AI, machine learning, analytics, data governance, and Databricks’ newest innovations.",
-    "registration_deadline": null,
-    "ticket_price": [
-      {
-        "label": "Early Bird",
-        "price": "$99"
-      },
-      {
-        "label": "Standard",
-        "price": "$199"
-      }
-    ],
-    "is_paid": true,
-    "themes": [
-      "Data Intelligence for All",
-      "Generative AI",
-      "Machine Learning",
-      "Data Governance"
-    ],
-    "scraping_method": "requests",
-    "source": "unknown",
-    "organizers": [
-      "Databricks"
-    ]
-  },
-  {
-    "name": "Databricks Data + AI Summit 2025",
-    "url": "https://www.montecarlodata.com/blog-databricks-data-ai-summit-2025/",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [
-      "data intelligence",
-      "data warehousing",
-      "governance",
-      "AI",
-      "machine learning"
-    ],
-    "sponsors": [
-      "Databricks",
-      "Monte Carlo"
-    ],
-    "speakers": [],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.623997",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Data + AI Summit 2025",
-    "url": "https://www.msn.com/en-us/money/other/databricks-unveils-star-studded-agenda-for-data-ai-summit-2025-in-san-francisco/vi-AA1FC0pU",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-06-25",
-    "end_date": "2025-06-27",
-    "topics": [
-      "Data Science",
-      "Artificial Intelligence",
-      "Machine Learning",
-      "Big Data",
-      "Cloud Computing"
-    ],
-    "sponsors": [
-      "Databricks",
-      "Microsoft",
-      "AWS"
-    ],
-    "speakers": [
-      "Ali Ghodsi",
-      "Andrew Ng",
-      "Fei-Fei Li"
-    ],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.624000",
-    "data_source": "conference_google_search",
-    "remote": false
-  },
-  {
-    "name": "Data + AI Summit",
-    "url": "https://dataaisummit.databricks.com/flow/db/dais2025/landing/page/home",
-    "is_remote": true,
-    "city": "San Francisco",
-    "start_date": "2025-06-09",
-    "end_date": "2025-06-12",
-    "topics": [],
     "sponsors": [],
-    "speakers": [],
-    "price": "TBD",
-    "organizer": "Databricks",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.624006",
-    "data_source": "conference_google_search",
-    "remote": true,
-    "short_description": "Join the Data + AI Summit to explore the latest advancements in data and artificial intelligence.",
-    "registration_deadline": null,
     "ticket_price": [],
     "is_paid": false,
     "themes": [],
+    "quality_score": 0.83,
+    "quality_flags": [
+      "basic_name",
+      "detailed_description",
+      "future_date",
+      "has_end_date",
+      "has_deadline",
+      "has_location",
+      "has_payment_info",
+      "high_quality"
+    ],
     "scraping_method": "requests",
-    "source": "unknown",
     "organizers": [
-      "Databricks"
+      "GSK.ai",
+      "GenAI, Meta",
+      "National Taiwan University",
+      "MIT",
+      "Data61❤CSIRO",
+      "Google DeepMind"
     ]
   },
   {
-    "name": "The AI Conference Shaping the future of AI",
-    "url": "https://www.botrepreneurs.live/events-conferences/2025/9/17/the-ai-conference-shaping-the-future-of-ai",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-09-17",
-    "end_date": "2025-09-18",
-    "topics": [
-      "AI development",
-      "AI strategy",
-      "AI applications",
-      "AI ethics",
-      "AI industry impact"
-    ],
-    "sponsors": [],
-    "speakers": [
-      "100+ visionary speakers"
-    ],
-    "price": "TBD",
-    "organizer": "TBD",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.624016",
-    "data_source": "conference_google_search",
+    "url": "https://icml.cc/Conferences/2025",
+    "source_type": "conference",
+    "is_enriched": true,
+    "timestamp_collected": "2025-06-05T08:57:23.520622",
+    "url_metadata": {
+      "name": "ICML 2025",
+      "start_date": "2025-07-21",
+      "end_date": "2025-07-27",
+      "city": "Vienna, Austria",
+      "remote": false,
+      "source": "icml",
+      "fetched_at": "2025-06-05T10:57:16.775003",
+      "data_source": "conference_website_scrapers"
+    },
+    "name": "ICML 2025",
+    "start_date": "2025-07-13",
+    "end_date": "2025-07-19",
+    "city": "Vancouver",
     "remote": false,
-    "short_description": "Join us at the AI Conference in San Francisco, where over 100 visionary speakers will explore the future of artificial intelligence across four dynamic tracks.",
+    "source": "icml",
+    "fetched_at": "2025-06-05T10:57:16.775003",
+    "data_source": "conference_website_scrapers",
+    "short_description": "The International Conference on Machine Learning (ICML) is the premier gathering of professionals dedicated to the advancement of machine learning.",
     "registration_deadline": null,
-    "ticket_price": [
-      {
-        "label": "Early Bird",
-        "price": "$99"
-      },
-      {
-        "label": "Standard",
-        "price": "$199"
-      }
-    ],
-    "is_paid": true,
-    "themes": [
-      "Developers Track",
-      "Technical Track",
-      "Strategy Track",
-      "Industry Deep Dive"
-    ],
-    "scraping_method": "firecrawl",
-    "source": "unknown"
-  },
-  {
-    "name": "The AI Conference 2025",
-    "url": "https://zoneofgenius.com/event/the-ai-conference-2025/",
-    "is_remote": false,
-    "city": "San Francisco",
-    "start_date": "2025-09-17",
-    "end_date": "2025-09-18",
-    "topics": [
-      "AI Frontiers",
-      "AI Developers",
-      "AI Strategy",
-      "Applied AI"
-    ],
-    "sponsors": [],
     "speakers": [],
-    "price": "$625",
-    "organizer": "Zone of Genius",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.624019",
-    "data_source": "conference_google_search",
-    "remote": false,
-    "short_description": "The AI Conference transforms San Francisco’s Pier 48 into the epicenter of artificial intelligence innovation.",
-    "registration_deadline": null,
-    "ticket_price": [
-      {
-        "label": "Standard",
-        "price": "$625"
-      }
-    ],
-    "is_paid": true,
-    "themes": [
-      "AI Frontiers Track",
-      "AI Developers Track",
-      "AI Strategy Track",
-      "Applied AI Track"
-    ],
-    "scraping_method": "requests",
-    "source": "unknown",
-    "organizers": [
-      "The AI Conference"
-    ]
-  },
-  {
-    "name": "Innovate San Francisco 2025",
-    "url": "https://1neai.com/event/innovate-sanfrancisco-2025/",
-    "is_remote": false,
-    "city": null,
-    "start_date": "2025-07-14",
-    "end_date": "2025-07-16",
-    "topics": [
-      "AI",
-      "Robotics",
-      "Networking",
-      "Workshops",
-      "Keynote"
-    ],
     "sponsors": [],
-    "speakers": [],
-    "price": "TBD",
-    "organizer": "1NE/AI Tech Events",
-    "success": true,
-    "fetched_at": "2025-06-03T18:48:29.624022",
-    "data_source": "conference_google_search",
-    "remote": true,
-    "short_description": "Join us for the Innovate San Francisco 2025 conference, where industry leaders gather to discuss the future of technology and innovation.",
-    "registration_deadline": null,
-    "ticket_price": [
-      {
-        "label": "Early Bird",
-        "price": "$99"
-      },
-      {
-        "label": "Standard",
-        "price": "$199"
-      }
-    ],
-    "is_paid": true,
+    "ticket_price": [],
+    "is_paid": false,
     "themes": [],
-    "scraping_method": "firecrawl",
-    "source": "unknown"
+    "quality_score": 0.88,
+    "quality_flags": [
+      "basic_name",
+      "detailed_description",
+      "meaningful_content",
+      "future_date",
+      "has_end_date",
+      "invalid_deadline",
+      "has_location",
+      "has_payment_info",
+      "high_quality"
+    ],
+    "scraping_method": "requests"
+  },
+  {
+    "url": "https://techmeme.com/events",
+    "source_type": "conference",
+    "is_enriched": true,
+    "timestamp_collected": "2025-06-05T08:57:24.323433",
+    "url_metadata": {
+      "name": "Jun 2-5Siemens Realize LIVE AmericasDetroit",
+      "start_date": null,
+      "end_date": null,
+      "city": null,
+      "remote": false,
+      "source": "techmeme",
+      "fetched_at": "2025-06-05T10:57:16.775008",
+      "data_source": "conference_website_scrapers"
+    },
+    "name": "Summer Game Fest",
+    "start_date": "2025-06-06",
+    "end_date": "2025-06-06",
+    "city": null,
+    "remote": true,
+    "source": "techmeme",
+    "fetched_at": "2025-06-05T10:57:16.775008",
+    "data_source": "conference_website_scrapers",
+    "short_description": "A virtual event showcasing the latest in gaming.",
+    "registration_deadline": null,
+    "speakers": [],
+    "sponsors": [],
+    "ticket_price": [],
+    "is_paid": false,
+    "themes": [],
+    "quality_score": 0.43,
+    "quality_flags": [
+      "basic_name",
+      "spammy_name",
+      "basic_description",
+      "future_date",
+      "has_end_date",
+      "remote_event",
+      "has_payment_info"
+    ],
+    "scraping_method": "requests"
   }
 ]

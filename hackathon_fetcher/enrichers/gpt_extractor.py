@@ -260,6 +260,29 @@ class GPTExtractor:
             
             extracted_data = json.loads(result_text)
             
+            # **FIX: Handle case where GPT returns a list instead of a dictionary**
+            if isinstance(extracted_data, list):
+                if len(extracted_data) > 0 and isinstance(extracted_data[0], dict):
+                    # Take the first element if it's a list of dictionaries
+                    extracted_data = extracted_data[0]
+                    print(f"⚠️ GPT returned a list, using first element for {url}")
+                else:
+                    # Return error if list doesn't contain valid data
+                    return {
+                        'extraction_success': False,
+                        'url': url,
+                        'error': "GPT returned invalid list format",
+                        'raw_response': result_text[:500]
+                    }
+            elif not isinstance(extracted_data, dict):
+                # Handle case where it's neither list nor dict
+                return {
+                    'extraction_success': False,
+                    'url': url,
+                    'error': f"GPT returned unexpected data type: {type(extracted_data)}",
+                    'raw_response': result_text[:500]
+                }
+            
             # Validate extracted data structure
             extracted_data = self._validate_and_clean_extracted_data(extracted_data, url)
             
@@ -576,18 +599,33 @@ Example response:
             
             content = response.choices[0].message.content.strip()
             
-            # **IMPROVEMENT 5: Better JSON parsing with cleanup**
+            # Clean up response formatting
+            if content.startswith('```json'):
+                content = content[7:]
+            if content.endswith('```'):
+                content = content[:-3]
+            content = content.strip()
+            
+            # Parse JSON response
             try:
-                # Clean up common GPT formatting issues
-                if content.startswith('```json'):
-                    content = content[7:]
-                if content.endswith('```'):
-                    content = content[:-3]
-                content = content.strip()
-                
                 extracted_fields = json.loads(content)
                 
-                # **IMPROVEMENT 5: Enhanced validation for extracted fields**
+                # **FIX: Handle case where GPT returns a list instead of a dictionary**
+                if isinstance(extracted_fields, list):
+                    if len(extracted_fields) > 0 and isinstance(extracted_fields[0], dict):
+                        # Take the first element if it's a list of dictionaries
+                        extracted_fields = extracted_fields[0]
+                        print(f"⚠️ GPT returned a list in fallback extraction, using first element for {url}")
+                    else:
+                        # Return empty dict if list doesn't contain valid data
+                        print(f"⚠️ GPT returned invalid list format in fallback extraction for {url}")
+                        return {}
+                elif not isinstance(extracted_fields, dict):
+                    # Return empty dict if it's neither list nor dict
+                    print(f"⚠️ GPT returned unexpected data type in fallback extraction for {url}: {type(extracted_fields)}")
+                    return {}
+                
+                # Validate and return only the fields that were successfully extracted
                 validated_fields = {}
                 for field, value in extracted_fields.items():
                     if field in missing_fields and value:
