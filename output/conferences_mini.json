@@ -1,1 +1,215 @@
-[]
+[
+  {
+    "url": "https://aiconference.com/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "The AI Conference 2025 - Shaping the future of AI",
+    "start_date": "2025-09-17",
+    "end_date": "2025-09-18",
+    "registration_deadline": null,
+    "location": "San Francisco, CA",
+    "remote": false,
+    "themes": [
+      "AI",
+      "Generative AI",
+      "Biotech",
+      "Machine Learning",
+      "Data Science"
+    ],
+    "description": "Join the brightest minds in AI for 2 days of sessions, panels, and networking at Pier 48, Mission Rock.",
+    "registration_url": "https://aiconference.com/register"
+  },
+  {
+    "url": "https://mlconference.ai/new-york/program-ny/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Machine Learning Conference New York 2025",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "New York, NY",
+    "remote": false,
+    "themes": [
+      "Machine Learning",
+      "MLOps",
+      "AI Agent Bootcamp",
+      "ML Tools",
+      "ML Business"
+    ],
+    "description": "Machine Learning Conference in New York featuring speakers and talks on various ML topics.",
+    "registration_url": null
+  },
+  {
+    "url": "https://www.unite.ai/conferences/",
+    "name": "Conference at ",
+    "source": "mini",
+    "extraction_success": false
+  },
+  {
+    "url": "https://www.databricks.com/dataaisummit",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Data + AI Summit 2025",
+    "start_date": "2025-06-09",
+    "end_date": "2025-06-12",
+    "registration_deadline": null,
+    "location": "San Francisco, CA",
+    "remote": false,
+    "themes": [
+      "Data Intelligence",
+      "Analytics",
+      "AI"
+    ],
+    "description": "Join 20,000 peers for 700+ sessions at the world\u2019s largest data, analytics, and AI conference.",
+    "registration_url": "https://www.databricks.com/dataaisummit/register"
+  },
+  {
+    "url": "https://newyork.theaisummit.com/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "The AI Summit New York",
+    "start_date": "2025-12-10",
+    "end_date": "2025-12-11",
+    "registration_deadline": null,
+    "location": "New York, NY",
+    "remote": false,
+    "themes": [
+      "AI",
+      "Enterprise",
+      "Technology",
+      "Innovation",
+      "Business"
+    ],
+    "description": "The AI Summit New York is the go-to global platform for enterprise leaders to move from ideas to action, bringing together visionary minds, cutting-edge tech, and real-world strategies that turn theory into profit.",
+    "registration_url": "https://newyork.theaisummit.com/register"
+  },
+  {
+    "url": "https://www.eventbrite.com/signin/signup/?referrer=%2Fd%2Fonline%2Fai-conference%2F",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "AI Conference 2022",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Online",
+    "remote": false,
+    "description": "Join us for the annual AI Conference showcasing the latest advancements in artificial intelligence.",
+    "registration_url": "https://www.eventbrite.com/signin/signup/?referrer=%2Fd%2Fonline%2Fai-conference%2F",
+    "themes": [
+      "AI",
+      "Machine Learning",
+      "Data Science"
+    ]
+  },
+  {
+    "url": "https://www.eventbrite.com/organizer/features/event-marketing-platform/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "The Best Event Marketing Platform: Tools To Grow Your Brand",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": true,
+    "description": "Eventbrite is the leading event ticketing and discovery platform trusted by millions of organizers and attendees around the world.",
+    "registration_url": "https://www.eventbrite.com/organizer/features/event-marketing-platform/",
+    "themes": [
+      "Event Marketing",
+      "Brand Growth",
+      "Email Marketing"
+    ]
+  },
+  {
+    "url": "https://www.eventbrite.com/organizer/features/event-payment/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Event Payment System",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": false,
+    "description": "Take the guesswork out of accepting payments and receiving payouts with tools available for all organizers.",
+    "registration_url": null,
+    "themes": [
+      "Event Payment",
+      "Online Payments",
+      "Event Management"
+    ]
+  },
+  {
+    "url": "https://www.eventbrite.com/organizer/event-format/host-retail-events/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Host Retail Events",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": false,
+    "description": "Grow your retail business with unique event experiences. Build meaningful customer connections, reach new people, and stand out from the crowd by creating unique experiences your customers will love.",
+    "registration_url": null,
+    "themes": [
+      "Retail",
+      "Customer Connections",
+      "Unique Experiences"
+    ]
+  },
+  {
+    "url": "https://www.eventbrite.com/organizer/event-type/festival-solutions/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Festival Solutions for Fairs & Festivals",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": false,
+    "description": "Sell festival tickets on the leading events platform. Eventbrite\u2019s festival management software gives you the built-in tools to create, promote, and sell festival tickets online to your target audience.",
+    "registration_url": null,
+    "themes": [
+      "Festivals",
+      "Ticketing",
+      "Event Management"
+    ]
+  },
+  {
+    "url": "https://www.eventbrite.com/resources/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Eventbrite Organizer Resource Hub",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": false,
+    "description": "Access valuable resources for event organizers including event planning, budgeting, marketing, and production tips.",
+    "registration_url": "https://www.eventbrite.com/resources/",
+    "themes": [
+      "Event Planning",
+      "Event Budgeting",
+      "Event Marketing",
+      "Event Production",
+      "AI Tools"
+    ]
+  },
+  {
+    "url": "https://events.google.com/io/",
+    "source": "mini",
+    "extraction_success": true,
+    "name": "Google I/O 2025",
+    "start_date": null,
+    "end_date": null,
+    "registration_deadline": null,
+    "location": "Remote",
+    "remote": false,
+    "description": "Catch up on Google I/O and check out the latest announcements. Join us at I/O Connect to explore, network, and get hands-on with the latest products. Solve the I/O puzzle to guide, reflect, and split beams of light.",
+    "registration_url": null,
+    "themes": [
+      "Android",
+      "AI",
+      "Web",
+      "Cloud"
+    ]
+  }
+]
