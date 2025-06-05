@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // Use environment variable for API URL, fallback to localhost for development
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://events-api-nprw.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const EventsPage = () => {
   const [events, setEvents] = useState([]);
@@ -50,6 +50,37 @@ const EventsPage = () => {
     }
   };
 
+  // Define handleActionSelect function
+  async function handleActionSelect(eventId, eventType, action) {
+    if (!action) return;
+    console.log(`Attempting action: ${action} for event ${eventId} (${eventType})`); // For debugging
+    try {
+      const res = await fetch(`${API_BASE_URL}/event-action`, { // Use API_BASE_URL
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          event_type: eventType,
+          action,
+        }),
+      });
+      if (res.ok) {
+        console.log("Action recorded successfully, reloading..."); // For debugging
+        // Instead of full reload, ideally re-fetch events or update specific event
+        // For simplicity as requested, using reload for now:
+        fetchEvents(); // Re-fetch all events to update UI
+        // window.location.reload(); // Alternative: full page reload
+      } else {
+        const errorData = await res.json();
+        console.error("Failed to record action:", res.status, errorData); // Log error details
+        alert(`Failed to record action: ${errorData.detail || res.statusText}`);
+      }
+    } catch (error) {
+      console.error("Action submission failed:", error);
+      alert("Error submitting action.");
+    }
+  }
+
   // Fetch events from API
   const fetchEvents = async () => {
     try {
@@ -61,23 +92,37 @@ const EventsPage = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
+      let data = await response.json();
+
+      // Ensure event.id is a string for consistent key usage later
+      data = data.map(event => ({ ...event, id: String(event.id) }));
+      
       setEvents(data);
       setFilteredEvents(data);
       
-      // Fetch actions for all events
+      // If backend /events now directly includes last_action and action_time,
+      // the separate fetchEventAction loop might not be needed anymore.
+      // For now, keeping the existing logic for eventActions for compatibility
+      // until backend changes are confirmed and applied here.
       const actionsMap = {};
       await Promise.all(
         data.map(async (event) => {
           if (event.id) {
-            const action = await fetchEventAction(event.id);
-            if (action) {
-              actionsMap[event.id] = action;
+            // If last_action and action_time are already in event object from /events, use them directly
+            // Otherwise, fetch separately (current logic)
+            if (event.last_action && event.action_time) {
+              actionsMap[event.id] = { action: event.last_action, timestamp: event.action_time };
+            } else {
+              // Fallback to fetching individually if not provided by /events (legacy or transition)
+              const action = await fetchEventAction(event.id); // fetchEventAction might be deprecated
+              if (action) {
+                actionsMap[event.id] = action;
+              }
             }
           }
         })
       );
-      setEventActions(actionsMap);
+      setEventActions(actionsMap); // This state might become redundant
       
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -304,11 +349,14 @@ const EventsPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Action Time
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Manage
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedFilteredEvents.map((event) => (
-                  <tr key={event.id || event.title} className="hover:bg-gray-50">
+                  <tr key={String(event.id) || event.title} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{event.title}</div>
                     </td>
@@ -339,14 +387,32 @@ const EventsPage = () => {
                       ) : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {eventActions[event.id]?.action ? (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(eventActions[event.id].action)}`}>
-                          {eventActions[event.id].action}
+                      {/* Use event.last_action directly if backend provides it */}
+                      {event.last_action ? (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(event.last_action)}`}>
+                          {event.last_action}
                         </span>
-                      ) : 'N/A'}
+                      ) : (eventActions[event.id]?.action ? (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(eventActions[event.id].action)}`}>
+                            {eventActions[event.id].action}
+                          </span>
+                        ) : '—')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {eventActions[event.id]?.timestamp ? formatActionTime(eventActions[event.id].timestamp) : 'N/A'}
+                      {/* Use event.action_time directly if backend provides it */}
+                      {event.action_time ? formatActionTime(event.action_time) :
+                       (eventActions[event.id]?.timestamp ? formatActionTime(eventActions[event.id].timestamp) : '—')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <select
+                        defaultValue=""
+                        onChange={(e) => handleActionSelect(String(event.id), event.type, e.target.value)}
+                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      >
+                        <option value="" disabled>Choose Action</option>
+                        <option value="reached_out">Mark as Reached Out</option>
+                        <option value="archive">Archive</option>
+                      </select>
                     </td>
                   </tr>
                 ))}
