@@ -9,10 +9,26 @@ const EventsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Filter states
+  // Filter states - removed statusFilter
   const [typeFilter, setTypeFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+
+  // Normalize location function
+  const normalizeLocation = (location) => {
+    if (!location) return 'N/A';
+    
+    // Replace Virtual/Online with Remote
+    if (location.toLowerCase().includes('virtual') || location.toLowerCase().includes('online')) {
+      return 'Remote';
+    }
+    
+    // Convert all-uppercase to proper case
+    if (location === location.toUpperCase() && location.length > 2) {
+      return location.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    return location;
+  };
 
   // Fetch events from API
   const fetchEvents = async () => {
@@ -41,7 +57,7 @@ const EventsPage = () => {
     fetchEvents();
   }, []);
 
-  // Filter events based on selected filters
+  // Filter events based on selected filters - removed status filtering
   useEffect(() => {
     let filtered = events;
 
@@ -51,43 +67,28 @@ const EventsPage = () => {
 
     if (locationFilter) {
       filtered = filtered.filter(event => 
-        event.location && event.location.toLowerCase().includes(locationFilter.toLowerCase())
+        event.location && normalizeLocation(event.location).toLowerCase().includes(locationFilter.toLowerCase())
       );
     }
 
-    if (statusFilter) {
-      filtered = filtered.filter(event => event.status === statusFilter);
-    }
-
     setFilteredEvents(filtered);
-  }, [events, typeFilter, locationFilter, statusFilter]);
+  }, [events, typeFilter, locationFilter]);
 
-  // Get unique values for filter dropdowns
+  // Get unique values for filter dropdowns - removed uniqueStatuses
   const uniqueTypes = [...new Set(events.map(event => event.type))];
-  const uniqueStatuses = [...new Set(events.map(event => event.status))];
 
-  // Format date for display
+  // Format date for display - updated to handle invalid dates
   const formatDate = (dateString) => {
-    if (!dateString) return 'Invalid Date';
+    if (!dateString) return '—';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) { // Check if date is valid
-      return 'Invalid Date';
+      return 'TBD';
     }
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
-  };
-
-  // Get status badge color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'complete': return 'bg-green-100 text-green-800';
-      case 'partial': return 'bg-yellow-100 text-yellow-800';
-      case 'minimal': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
   };
 
   // Get type badge color
@@ -172,11 +173,11 @@ const EventsPage = () => {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - updated to 2 columns since status filter is removed */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Type Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
@@ -205,27 +206,10 @@ const EventsPage = () => {
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Status</option>
-                {uniqueStatuses.map(status => (
-                  <option key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
 
-        {/* Events Table */}
+        {/* Events Table - removed status column */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">
@@ -253,21 +237,13 @@ const EventsPage = () => {
                     End Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     URL
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {/*
-                  Note: Interactive column sorting (clicking headers) for dates 
-                  would require additional state and logic, or a table library.
-                  Currently, events are pre-sorted by start_date descending.
-                */}
                 {sortedFilteredEvents.map((event) => (
-                  <tr key={event.id || event.title} className="hover:bg-gray-50"> {/* Added fallback key */}
+                  <tr key={event.id || event.title} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{event.title}</div>
                     </td>
@@ -277,18 +253,13 @@ const EventsPage = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {event.location || 'N/A'}
+                      {normalizeLocation(event.location)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(event.start_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(event.end_date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(event.status)}`}>
-                        {event.status}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {event.url ? (
