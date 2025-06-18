@@ -240,7 +240,7 @@ const EventsPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <div className="text-red-500 text-6xl mb-4">!</div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Events</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
@@ -422,7 +422,7 @@ const EventsPage = () => {
 
           {filteredEvents.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">📅</div>
+              <div className="text-gray-400 text-6xl mb-4"></div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
               <p className="text-gray-500">Try adjusting your filters or refresh the data.</p>
             </div>

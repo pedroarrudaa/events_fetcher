@@ -91,54 +91,98 @@ async def get_events(
     type_filter: Optional[str] = Query(None, description="Filter by event type: hackathon, conference"),
     location_filter: Optional[str] = Query(None, description="Filter by location"),
     status_filter: Optional[str] = Query(None, description="Filter by status: validated, filtered, enriched"),
-    limit: Optional[int] = Query(100, description="Limit number of results")
+    limit: Optional[int] = Query(None, description="Limit number of results"),
+    offset: int = Query(0, description="Number of records to skip for pagination")
 ):
     """
-    Get unified list of events from both hackathons and conferences tables.
+    High-performance unified list of events with optimized database queries.
     """
     try:
-        session = get_db_session()
-        events = []
+        from database_utils import get_optimized_db_session
+        from shared_utils import performance_monitor
         
-        # Fetch hackathons
-        hackathons_query = session.query(Hackathon)
-        if limit:
-            hackathons_query = hackathons_query.limit(limit // 2 if limit > 1 else 1) # Ensure at least 1 if limit is 1
-        hackathons = hackathons_query.all()
+        @performance_monitor
+        def get_optimized_events():
+            """Get events using optimized database operations."""
+            session = get_optimized_db_session()
+            events = []
+            
+            try:
+                # Build efficient database filters
+                def build_query(model_class):
+                    query = session.query(model_class).order_by(model_class.created_at.desc())
+                    
+                    # Apply database-level filters for better performance
+                    if location_filter and location_filter.lower() != "all":
+                        query = query.filter(model_class.location.ilike(f'%{location_filter}%'))
+                    
+                    return query
+                
+                # Determine per-table limits for balanced results
+                per_table_limit = None
+                if limit:
+                    per_table_limit = (limit + 1) // 2
+                
+                # Efficiently fetch hackathons
+                if not type_filter or type_filter.lower() in ['hackathon', 'all']:
+                    hackathons_query = build_query(Hackathon)
+                    if per_table_limit:
+                        hackathons_query = hackathons_query.limit(per_table_limit)
+                    if offset:
+                        hackathons_query = hackathons_query.offset(offset // 2)
+                    
+                    # Use yield_per for memory efficiency with large datasets
+                    for hackathon in hackathons_query.yield_per(100):
+                        event = normalize_event_data(hackathon, "hackathon")
+                        
+                        # Apply status filter efficiently
+                        if status_filter and status_filter.lower() != "all":
+                            if event.status.lower() != status_filter.lower():
+                                continue
+                        
+                        events.append(event)
+                        
+                        # Check limit early to avoid unnecessary processing
+                        if limit and len(events) >= limit:
+                            break
+                
+                # Efficiently fetch conferences
+                if (not type_filter or type_filter.lower() in ['conference', 'all']) and \
+                   (not limit or len(events) < limit):
+                    
+                    remaining_limit = None
+                    if limit:
+                        remaining_limit = limit - len(events)
+                        
+                    conferences_query = build_query(Conference)
+                    if remaining_limit:
+                        conferences_query = conferences_query.limit(remaining_limit)
+                    elif per_table_limit:
+                        conferences_query = conferences_query.limit(per_table_limit)
+                    if offset:
+                        conferences_query = conferences_query.offset(offset // 2)
+                    
+                    # Use yield_per for memory efficiency
+                    for conference in conferences_query.yield_per(100):
+                        event = normalize_event_data(conference, "conference")
+                        
+                        # Apply status filter efficiently
+                        if status_filter and status_filter.lower() != "all":
+                            if event.status.lower() != status_filter.lower():
+                                continue
+                        
+                        events.append(event)
+                        
+                        # Check limit early
+                        if limit and len(events) >= limit:
+                            break
+                
+                return events
+                
+            finally:
+                session.close()
         
-        for hackathon in hackathons:
-            event = normalize_event_data(hackathon, "hackathon")
-            events.append(event)
-        
-        # Fetch conferences
-        conferences_query = session.query(Conference)
-        if limit:
-            # Adjust limit for conferences based on how many hackathons were fetched
-            remaining_limit = limit - len(events)
-            if remaining_limit > 0:
-                conferences_query = conferences_query.limit(remaining_limit)
-            else: # if limit was already met by hackathons, or limit was small
-                conferences_query = conferences_query.limit(limit // 2 if limit > 1 else 1)
-
-        conferences = conferences_query.all()
-        
-        for conference in conferences:
-            event = normalize_event_data(conference, "conference")
-            events.append(event)
-        
-        session.close()
-        
-        # Apply filters
-        if type_filter and type_filter.lower() != "all":
-            events = [e for e in events if e.type.lower() == type_filter.lower()]
-        
-        if location_filter and location_filter.lower() != "all":
-            events = [e for e in events if location_filter.lower() in e.location.lower()]
-        
-        if status_filter and status_filter.lower() != "all":
-            events = [e for e in events if e.status.lower() == status_filter.lower()]
-        
-        return events
+        return get_optimized_events()
         
     except SQLAlchemyError as e:
         print(f"❌ Database error in /events: {e}")
@@ -146,133 +190,6 @@ async def get_events(
     except Exception as e:
         print(f"❌ Error fetching events: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-def get_mock_events(
-    type_filter: Optional[str] = None,
-    location_filter: Optional[str] = None, 
-    status_filter: Optional[str] = None,
-    limit: Optional[int] = 100
-) -> List[Event]:
-    """
-    Return mock events data for testing when database is not available.
-    """
-    mock_events = [
-        Event(
-            id="123e4567-e89b-12d3-a456-426614174000",
-            title="AI/ML Hackathon 2024",
-            type="hackathon",
-            location="San Francisco, CA",
-            start_date="2024-02-15",
-            end_date="2024-02-17",
-            url="https://example.com/ai-hackathon",
-            status="validated"
-        ),
-        Event(
-            id="987fcdeb-51a2-43d1-9f12-345678901234",
-            title="TechCrunch Disrupt 2024",
-            type="conference",
-            location="San Francisco, CA",
-            start_date="2024-03-10",
-            end_date="2024-03-12",
-            url="https://techcrunch.com/disrupt",
-            status="enriched"
-        ),
-        Event(
-            id="456789ab-cdef-1234-5678-90abcdef1234",
-            title="Global React Conference",
-            type="conference",
-            location="New York, NY",
-            start_date="2024-04-05",
-            end_date="2024-04-07",
-            url="https://react.global",
-            status="validated"
-        ),
-        Event(
-            id="fedcba98-7654-3210-fedc-ba9876543210",
-            title="Blockchain Hackathon",
-            type="hackathon",
-            location="Remote",
-            start_date="2024-03-20",
-            end_date="2024-03-22",
-            url="https://blockchain-hack.com",
-            status="filtered"
-        ),
-        Event(
-            id="abcdef12-3456-7890-abcd-ef1234567890",
-            title="DevOps Summit 2024",
-            type="conference",
-            location="Remote",
-            start_date="2024-05-15",
-            end_date="2024-05-16",
-            url="https://devops-summit.io",
-            status="enriched"
-        ),
-        Event(
-            id="13579bdf-2468-ace0-1357-9bdf2468ace0",
-            title="Climate Tech Hackathon",
-            type="hackathon",
-            location="New York, NY",
-            start_date="2024-04-12",
-            end_date="2024-04-14",
-            url="https://climate-tech-hack.org",
-            status="validated"
-        ),
-        Event(
-            id="2468ace0-1357-9bdf-2468-ace013579bdf",
-            title="Data Science Conference",
-            type="conference",
-            location="San Francisco, CA",
-            start_date="2024-06-01",
-            end_date="2024-06-03",
-            url="https://datasci-conf.com",
-            status="enriched"
-        ),
-        Event(
-            id="abcdef12-1111-2222-3333-fedcba987654",
-            title="Mobile App Hackathon",
-            type="hackathon",
-            location="Remote",
-            start_date="2024-05-25",
-            end_date="2024-05-27",
-            url="https://mobile-hack.dev",
-            status="filtered"
-        ),
-        Event(
-            id="abcdef12-4444-5555-6666-fedcba987654",
-            title="Cybersecurity Summit",
-            type="conference",
-            location="New York, NY",
-            start_date="2024-07-10",
-            end_date="2024-07-12",
-            url="https://cybersec-summit.net",
-            status="validated"
-        ),
-        Event(
-            id="abcdef12-7777-8888-9999-fedcba987654",
-            title="Green Energy Hackathon",
-            type="hackathon",
-            location="San Francisco, CA",
-            start_date="2024-06-20",
-            end_date="2024-06-22",
-            url="https://green-energy-hack.org",
-            status="enriched"
-        )
-    ]
-    
-    # Apply filters
-    if type_filter and type_filter.lower() != "all":
-        mock_events = [e for e in mock_events if e.type.lower() == type_filter.lower()]
-    
-    if location_filter and location_filter.lower() != "all":
-        mock_events = [e for e in mock_events if location_filter.lower() in e.location.lower()]
-    
-    if status_filter and status_filter.lower() != "all":
-        mock_events = [e for e in mock_events if e.status.lower() == status_filter.lower()]
-    
-    if limit:
-        mock_events = mock_events[:limit]
-    
-    return mock_events
 
 @app.get("/")
 async def root():
@@ -299,7 +216,6 @@ async def health_check():
         return {
             "status": "healthy",
             "database": "disconnected",
-            "note": "Using mock data",
             "error": str(e)
         }
 

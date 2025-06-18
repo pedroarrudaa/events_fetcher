@@ -58,32 +58,32 @@ def parse_arguments():
 
 def main():
     """Main CLI entry point."""
-    print("🎯 Event Action Recorder")
+    print("Event Action Recorder")
     print("=" * 50)
     
     try:
         args = parse_arguments()
         
         # Ensure database tables exist
-        print("🔧 Initializing database...")
+        print("Initializing database...")
         create_tables()
         
         if args.list:
             # List current action for the event
-            print(f"\n📋 Checking action for event: {args.event_id}")
+            print(f"\nChecking action for event: {args.event_id}")
             action_data = get_event_action(args.event_id)
             
             if action_data:
-                print(f"✅ Found action:")
+                print(f" Found action:")
                 print(f"   • Event ID: {action_data['event_id']}")
                 print(f"   • Event Type: {action_data['event_type']}")
                 print(f"   • Action: {action_data['action']}")
                 print(f"   • Timestamp: {action_data['timestamp']}")
             else:
-                print(f"📭 No action found for event: {args.event_id}")
+                print(f" No action found for event: {args.event_id}")
         else:
             # Record new action
-            print(f"\n📝 Recording action...")
+            print(f"\nRecording action...")
             print(f"   • Event ID: {args.event_id}")
             print(f"   • Event Type: {args.event_type}")
             print(f"   • Action: {args.action}")
@@ -92,23 +92,23 @@ def main():
             success = save_event_action(args.event_id, args.event_type, args.action)
             
             if success:
-                print(f"\n✅ Action recorded successfully!")
+                print(f"\n Action recorded successfully!")
                 
                 # Show the recorded action
                 action_data = get_event_action(args.event_id)
                 if action_data:
-                    print(f"\n📋 Confirmed action:")
+                    print(f"\nConfirmed action:")
                     print(f"   • Action: {action_data['action']}")
                     print(f"   • Timestamp: {action_data['timestamp']}")
             else:
-                print(f"\n❌ Failed to record action. Check the event ID and type.")
+                print(f"\nFailed to record action. Check the event ID and type.")
                 sys.exit(1)
         
     except KeyboardInterrupt:
-        print(f"\n\n⚠️ Operation cancelled by user")
+        print(f"\n\nOperation cancelled by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\nError: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
