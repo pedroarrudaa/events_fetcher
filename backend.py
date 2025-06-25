@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from database_utils import get_db_manager, Hackathon, Conference, save_event_action, get_event_action
+from shared_utils import DateParser
 from sqlalchemy.exc import SQLAlchemyError
 
 app = FastAPI(title="Events API", description="API for managing hackathons and conferences", version="1.0.0")
@@ -89,47 +90,17 @@ def normalize_event_data(event_obj, event_type: str) -> Event:
 def parse_date_string(date_str: str) -> Optional[date]:
     """
     Parse various date string formats to datetime.date object.
+    Uses unified DateParser for consistency across the application.
     """
-    if not date_str or date_str.strip() == '' or date_str == 'TBD':
-        return None
-    
-    # Common date formats to try
-    formats = [
-        '%Y-%m-%d',      # 2025-01-15
-        '%b %d, %Y',     # Jan 15, 2025
-        '%B %d, %Y',     # January 15, 2025
-        '%m/%d/%Y',      # 01/15/2025
-        '%d/%m/%Y',      # 15/01/2025
-        '%Y/%m/%d',      # 2025/01/15
-    ]
-    
-    date_str = date_str.strip()
-    
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
-    
-    # If none of the formats work, return None
-    return None
+    return DateParser.parse_to_date(date_str)
 
 def is_event_future_only(start_date_str: str, end_date_str: str = None) -> bool:
     """
     Check if an event is in the future (hasn't started yet).
     Only return True for events that start in the future.
+    Uses unified DateParser for consistency.
     """
-    today = date.today()
-    
-    # Try to parse start date
-    start_date = parse_date_string(start_date_str)
-    
-    # If we can't parse the start date, keep the event (better safe than sorry)
-    if start_date is None:
-        return True
-    
-    # Event must start in the future (start_date > today)
-    return start_date > today
+    return DateParser.is_future_date(start_date_str)
 
 def get_event_sort_key(event: Event) -> tuple:
     """

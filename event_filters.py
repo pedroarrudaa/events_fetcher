@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple, Set
 from dataclasses import dataclass, field
 from functools import lru_cache
+from shared_utils import DateParser
 
 @dataclass
 class FilterConfig:
@@ -130,22 +131,17 @@ class EventFilter:
         return bool(re.search(self._location_pattern, location_text, re.IGNORECASE))
     
     def _is_future_event(self, event: Dict[str, Any]) -> bool:
-        """Check if event is in the future."""
+        """Check if event is in the future using unified DateParser."""
         date_fields = ['start_date', 'date', 'end_date']
-        today = datetime.now().date()
         
         for field in date_fields:
             date_str = event.get(field)
             if not date_str:
                 continue
             
-            # Try multiple date formats
-            for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S']:
-                try:
-                    event_date = datetime.strptime(str(date_str).strip(), fmt).date()
-                    return event_date >= today  # Strict future-only filtering
-                except ValueError:
-                    continue
+            # Use unified DateParser for consistent parsing
+            if DateParser.is_valid_date(str(date_str)):
+                return DateParser.is_future_date(str(date_str))
         
         # If no valid date found, assume it's future (benefit of doubt for events without dates)
         return True

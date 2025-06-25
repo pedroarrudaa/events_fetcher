@@ -11,21 +11,11 @@ from datetime import datetime, date
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database_utils import get_db_manager, Hackathon, Conference
+from shared_utils import DateParser
 
 def parse_date_string(date_str):
-    """Parse date string to date object"""
-    if not date_str or date_str.strip() == '' or date_str == 'TBD':
-        return None
-    
-    formats = ['%Y-%m-%d', '%b %d, %Y', '%B %d, %Y', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d']
-    date_str = date_str.strip()
-    
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
-    return None
+    """Parse date string to date object using unified DateParser"""
+    return DateParser.parse_to_date(date_str)
 
 def clean_past_events():
     """Remove events that have already started"""

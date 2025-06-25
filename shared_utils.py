@@ -6,7 +6,7 @@ import time
 import csv
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from dataclasses import dataclass, field, fields
 from typing import List, Dict, Any, Optional, Callable, Union
 from functools import lru_cache, wraps
@@ -205,8 +205,9 @@ class EventProcessor:
                         if groups[0].isdigit():  # YYYY-MM-DD format
                             return f"{groups[0]}-{groups[1]:0>2}-{groups[2]:0>2}", f"{groups[3]}-{groups[4]:0>2}-{groups[5]:0>2}"
                         else:  # Month name format
-                            start = datetime.strptime(f"{groups[0]} {groups[1]} {groups[3]}", "%B %d %Y").strftime("%Y-%m-%d")
-                            end = datetime.strptime(f"{groups[0]} {groups[2]} {groups[3]}", "%B %d %Y").strftime("%Y-%m-%d")
+                            # Use DateParser for consistent parsing and formatting
+                            start = DateParser.format_to_iso(f"{groups[0]} {groups[1]} {groups[3]}")
+                            end = DateParser.format_to_iso(f"{groups[0]} {groups[2]} {groups[3]}")
                             return start, end
                 except: continue
         return None, None
@@ -775,16 +776,161 @@ class QueryGenerator:
         return queries  # Remove the limit - let the discovery function handle limits
 
 # Utility functions
-def validate_date(date_str: str) -> Optional[str]:
-    """Validate and normalize date string."""
-    if not date_str:
+class DateParser:
+    """
+    Unified date parsing class that consolidates all date format handling
+    across the events dashboard. Provides a single source of truth for
+    date validation, parsing, and formatting.
+    """
+    
+    # Comprehensive list of supported date formats from all components
+    SUPPORTED_FORMATS = [
+        # ISO and standard formats
+        '%Y-%m-%d',           # 2025-01-15 (ISO format - preferred)
+        '%Y-%m-%d %H:%M:%S',  # 2025-01-15 14:30:00 (with timestamp)
+        '%Y/%m/%d',           # 2025/01/15
+        
+        # US formats
+        '%m/%d/%Y',           # 01/15/2025 (US format)
+        '%m-%d-%Y',           # 01-15-2025
+        
+        # European formats  
+        '%d/%m/%Y',           # 15/01/2025 (European format)
+        '%d-%m-%Y',           # 15-01-2025
+        
+        # Written month formats
+        '%B %d, %Y',          # January 15, 2025 (full month name)
+        '%b %d, %Y',          # Jan 15, 2025 (abbreviated month name)
+        '%B %d %Y',           # January 15 2025 (no comma)
+        '%b %d %Y',           # Jan 15 2025 (no comma)
+        
+        # Additional common formats
+        '%Y.%m.%d',           # 2025.01.15
+        '%d.%m.%Y',           # 15.01.2025
+        '%m.%d.%Y',           # 01.15.2025
+    ]
+    
+    @classmethod
+    def parse_to_date(cls, date_str: str) -> Optional[date]:
+        """
+        Parse various date string formats to datetime.date object.
+        
+        Args:
+            date_str: Date string to parse
+            
+        Returns:
+            datetime.date object or None if parsing fails
+        """
+        if not date_str or not isinstance(date_str, str):
+            return None
+            
+        # Clean and validate input
+        date_str = date_str.strip()
+        if not date_str or date_str.upper() in ('TBD', 'N/A', 'NONE', ''):
+            return None
+        
+        # Try each format until one works
+        for fmt in cls.SUPPORTED_FORMATS:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        
+        # If none of the standard formats work, return None
         return None
-    for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']:
-        try:
-            return datetime.strptime(date_str.strip(), fmt).strftime('%Y-%m-%d')
-        except ValueError:
-            continue
-    return None
+    
+    @classmethod
+    def parse_to_datetime(cls, date_str: str) -> Optional[datetime]:
+        """
+        Parse date string to datetime object (preserves time if present).
+        
+        Args:
+            date_str: Date string to parse
+            
+        Returns:
+            datetime object or None if parsing fails
+        """
+        if not date_str or not isinstance(date_str, str):
+            return None
+            
+        date_str = date_str.strip()
+        if not date_str or date_str.upper() in ('TBD', 'N/A', 'NONE', ''):
+            return None
+        
+        # Try each format until one works
+        for fmt in cls.SUPPORTED_FORMATS:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        
+        return None
+    
+    @classmethod
+    def format_to_iso(cls, date_str: str) -> Optional[str]:
+        """
+        Parse date string and return in ISO format (YYYY-MM-DD).
+        
+        Args:
+            date_str: Date string to parse and format
+            
+        Returns:
+            ISO formatted date string or None if parsing fails
+        """
+        parsed_date = cls.parse_to_date(date_str)
+        if parsed_date:
+            return parsed_date.strftime('%Y-%m-%d')
+        return None
+    
+    @classmethod
+    def is_future_date(cls, date_str: str, reference_date: Optional[date] = None) -> bool:
+        """
+        Check if a date string represents a future date.
+        
+        Args:
+            date_str: Date string to check
+            reference_date: Date to compare against (defaults to today)
+            
+        Returns:
+            True if date is in the future, False otherwise
+        """
+        parsed_date = cls.parse_to_date(date_str)
+        if parsed_date is None:
+            # If we can't parse the date, assume it's future for safety
+            return True
+        
+        if reference_date is None:
+            reference_date = date.today()
+        
+        return parsed_date > reference_date
+    
+    @classmethod
+    def is_valid_date(cls, date_str: str) -> bool:
+        """
+        Check if a date string can be successfully parsed.
+        
+        Args:
+            date_str: Date string to validate
+            
+        Returns:
+            True if date can be parsed, False otherwise
+        """
+        return cls.parse_to_date(date_str) is not None
+    
+    @classmethod
+    def get_supported_formats(cls) -> List[str]:
+        """
+        Get list of all supported date formats.
+        
+        Returns:
+            List of format strings
+        """
+        return cls.SUPPORTED_FORMATS.copy()
+
+# Legacy compatibility functions that now use DateParser
+def validate_date(date_str: str) -> Optional[str]:
+    """Validate and normalize date string. (Legacy function - use DateParser.format_to_iso)"""
+    return DateParser.format_to_iso(date_str)
 
 def deduplicate_by_url(events: List[Event]) -> List[Event]:
     """Remove duplicate events by URL."""
