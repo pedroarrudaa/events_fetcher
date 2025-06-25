@@ -892,12 +892,13 @@ class DateParser:
             reference_date: Date to compare against (defaults to today)
             
         Returns:
-            True if date is in the future, False otherwise
+            True if date is in the future, False otherwise.
+            Returns False for unparseable dates (TBD, invalid, etc.)
         """
         parsed_date = cls.parse_to_date(date_str)
         if parsed_date is None:
-            # If we can't parse the date, assume it's future for safety
-            return True
+            # If we can't parse the date, it's not a valid future date
+            return False
         
         if reference_date is None:
             reference_date = date.today()
