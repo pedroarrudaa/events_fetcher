@@ -33,7 +33,7 @@ def clean_past_events():
         for hackathon in hackathons:
             start_date = parse_date_string(hackathon.start_date)
             if start_date and start_date <= today:  # Started or starting today
-                print(f"❌ Removing hackathon: {hackathon.start_date} - {hackathon.name}")
+                print(f"REMOVED: Removing hackathon: {hackathon.start_date} - {hackathon.name}")
                 session.delete(hackathon)
                 removed_hackathons += 1
         
@@ -44,14 +44,14 @@ def clean_past_events():
         for conference in conferences:
             start_date = parse_date_string(conference.start_date)
             if start_date and start_date <= today:  # Started or starting today
-                print(f"❌ Removing conference: {conference.start_date} - {conference.name}")
+                print(f"REMOVED: Removing conference: {conference.start_date} - {conference.name}")
                 session.delete(conference)
                 removed_conferences += 1
         
         # Commit the changes
         session.commit()
         
-        print(f"\n✅ Cleanup complete:")
+        print(f"\nSUCCESS: Cleanup complete:")
         print(f"   - Removed {removed_hackathons} past hackathons")
         print(f"   - Removed {removed_conferences} past conferences")
         print(f"   - Total removed: {removed_hackathons + removed_conferences}")
@@ -60,7 +60,7 @@ def clean_past_events():
         remaining_hackathons = session.query(Hackathon).count()
         remaining_conferences = session.query(Conference).count()
         
-        print(f"\n📊 Remaining events:")
+        print(f"\nSTATS: Remaining events:")
         print(f"   - Hackathons: {remaining_hackathons}")
         print(f"   - Conferences: {remaining_conferences}")
         print(f"   - Total: {remaining_hackathons + remaining_conferences}")

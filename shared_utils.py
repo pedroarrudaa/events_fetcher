@@ -335,7 +335,7 @@ class WebScraper:
         if not urls:
             return []
         
-        print(f"🔍 Scraping {len(urls)} URLs concurrently (max_concurrent={max_concurrent})")
+        print(f"INFO: Scraping {len(urls)} URLs concurrently (max_concurrent={max_concurrent})")
         
         # Create semaphore within the async context to ensure it's created in the same event loop
         semaphore = asyncio.Semaphore(max_concurrent)
@@ -363,7 +363,7 @@ class WebScraper:
                 processed_results.append(result)
         
         successful = sum(1 for r in processed_results if r.get('success', False))
-        print(f"✅ Scraping completed: {successful}/{len(urls)} successful")
+        print(f"SUCCESS: Scraping completed: {successful}/{len(urls)} successful")
         
         return processed_results
     
@@ -716,7 +716,7 @@ class ParallelAsyncProcessor:
                 await asyncio.sleep(0.1)
         
         successful = sum(1 for r in results if not isinstance(r, dict) or 'error' not in r)
-        print(f"✅ Async processing completed: {successful}/{len(items)} successful")
+        print(f"SUCCESS: Async processing completed: {successful}/{len(items)} successful")
         
         return results
 

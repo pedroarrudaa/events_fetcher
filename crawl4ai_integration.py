@@ -131,7 +131,7 @@ class Crawl4AIEventScraper:
     
     async def _scrape_single_page(self, url: str, extract_structured_data: bool = True) -> Dict[str, Any]:
         """Internal method to scrape a single page."""
-        print(f"🔍 Scraping event page with Crawl4AI: {url}")
+        print(f"INFO: Scraping event page with Crawl4AI: {url}")
         
         try:
             # Configure extraction strategy

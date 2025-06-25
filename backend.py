@@ -213,10 +213,10 @@ async def get_events(
         return get_optimized_events()
         
     except SQLAlchemyError as e:
-        print(f"❌ Database error in /events: {e}")
+        print(f"ERROR: Database error in /events: {e}")
         raise HTTPException(status_code=503, detail=f"Database connection error: {str(e)}")
     except Exception as e:
-        print(f"❌ Error fetching events: {e}")
+        print(f"ERROR: Error fetching events: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/")
