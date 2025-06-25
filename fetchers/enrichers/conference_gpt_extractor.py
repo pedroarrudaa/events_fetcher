@@ -1,8 +1,5 @@
 """
-Conference GPT Extractor - Simplified using shared EventGPTExtractor.
-
-This module provides a thin wrapper around the unified EventGPTExtractor
-for conference-specific functionality.
+Conference GPT Extractor 
 """
 
 import logging

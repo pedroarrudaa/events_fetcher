@@ -117,10 +117,8 @@ class EventFilter:
         self.seen_urls.add(normalized_url)
         return True
     
-    @lru_cache(maxsize=1000)
     def _is_target_location(self, event: Dict[str, Any]) -> bool:
-        """Check if event is in target location with caching."""
-        # Convert dict to hashable representation for caching
+        """Check if event is in target location."""
         location_text = ' '.join(filter(None, [
             str(event.get('location', '')),
             str(event.get('city', '')),
@@ -145,11 +143,11 @@ class EventFilter:
             for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S']:
                 try:
                     event_date = datetime.strptime(str(date_str).strip(), fmt).date()
-                    return event_date >= today - timedelta(days=30)  # Allow 30-day grace period
+                    return event_date >= today  # Strict future-only filtering
                 except ValueError:
                     continue
         
-        # If no valid date found, assume it's future (benefit of doubt)
+        # If no valid date found, assume it's future (benefit of doubt for events without dates)
         return True
     
     def _is_actually_hackathon(self, event: Dict[str, Any]) -> bool:

@@ -2,7 +2,7 @@
 FastAPI backend for serving unified events data from hackathons and conferences tables.
 """
 import os
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,7 +62,7 @@ def normalize_event_data(event_obj, event_type: str) -> Event:
             'name': event_obj.name,
             'url': event_obj.url,
             'location': event_obj.location or 'TBD',
-            'start_date': event_obj.start_date or event_obj.date or 'TBD',
+            'start_date': event_obj.start_date or 'TBD',
             'end_date': event_obj.end_date or 'TBD',
         }
     else:
@@ -86,16 +86,77 @@ def normalize_event_data(event_obj, event_type: str) -> Event:
         status=status
     )
 
+def parse_date_string(date_str: str) -> Optional[date]:
+    """
+    Parse various date string formats to datetime.date object.
+    """
+    if not date_str or date_str.strip() == '' or date_str == 'TBD':
+        return None
+    
+    # Common date formats to try
+    formats = [
+        '%Y-%m-%d',      # 2025-01-15
+        '%b %d, %Y',     # Jan 15, 2025
+        '%B %d, %Y',     # January 15, 2025
+        '%m/%d/%Y',      # 01/15/2025
+        '%d/%m/%Y',      # 15/01/2025
+        '%Y/%m/%d',      # 2025/01/15
+    ]
+    
+    date_str = date_str.strip()
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    
+    # If none of the formats work, return None
+    return None
+
+def is_event_future_only(start_date_str: str, end_date_str: str = None) -> bool:
+    """
+    Check if an event is in the future (hasn't started yet).
+    Only return True for events that start in the future.
+    """
+    today = date.today()
+    
+    # Try to parse start date
+    start_date = parse_date_string(start_date_str)
+    
+    # If we can't parse the start date, keep the event (better safe than sorry)
+    if start_date is None:
+        return True
+    
+    # Event must start in the future (start_date > today)
+    return start_date > today
+
+def get_event_sort_key(event: Event) -> tuple:
+    """
+    Generate a sort key for events. Events with valid dates come first,
+    sorted by start date. Events without valid dates come last.
+    """
+    start_date = parse_date_string(event.start_date)
+    
+    if start_date is None:
+        # Events without valid dates go to the end
+        return (1, date.max)
+    else:
+        # Events with valid dates come first, sorted by date
+        return (0, start_date)
+
 @app.get("/events", response_model=List[Event])
 async def get_events(
     type_filter: Optional[str] = Query(None, description="Filter by event type: hackathon, conference"),
     location_filter: Optional[str] = Query(None, description="Filter by location"),
     status_filter: Optional[str] = Query(None, description="Filter by status: validated, filtered, enriched"),
     limit: Optional[int] = Query(None, description="Limit number of results"),
-    offset: int = Query(0, description="Number of records to skip for pagination")
+    offset: int = Query(0, description="Number of records to skip for pagination"),
+    include_past: bool = Query(False, description="Include events that have already started/ended")
 ):
     """
     High-performance unified list of events with optimized database queries.
+    Events are filtered to show only future events (that haven't started yet) by default and sorted by start date.
     """
     try:
         def get_optimized_events():
@@ -114,16 +175,10 @@ async def get_events(
                     
                     return query
                 
-                # Determine per-table limits for balanced results
-                per_table_limit = None
-                if limit:
-                    per_table_limit = (limit + 1) // 2
-                
                 # Efficiently fetch hackathons
                 if not type_filter or type_filter.lower() in ['hackathon', 'all']:
                     hackathons_query = build_query(Hackathon)
-                    if per_table_limit:
-                        hackathons_query = hackathons_query.limit(per_table_limit)
+                    # Don't limit initially, we'll sort and limit later
                     if offset:
                         hackathons_query = hackathons_query.offset(offset // 2)
                     
@@ -131,30 +186,20 @@ async def get_events(
                     for hackathon in hackathons_query.yield_per(100):
                         event = normalize_event_data(hackathon, "hackathon")
                         
+                        # Filter out past events unless specifically requested
+                        if not include_past and not is_event_future_only(event.start_date, event.end_date):
+                            continue
+                        
                         # Apply status filter efficiently
                         if status_filter and status_filter.lower() != "all":
                             if event.status.lower() != status_filter.lower():
                                 continue
                         
                         events.append(event)
-                        
-                        # Check limit early to avoid unnecessary processing
-                        if limit and len(events) >= limit:
-                            break
                 
                 # Efficiently fetch conferences
-                if (not type_filter or type_filter.lower() in ['conference', 'all']) and \
-                   (not limit or len(events) < limit):
-                    
-                    remaining_limit = None
-                    if limit:
-                        remaining_limit = limit - len(events)
-                        
+                if not type_filter or type_filter.lower() in ['conference', 'all']:
                     conferences_query = build_query(Conference)
-                    if remaining_limit:
-                        conferences_query = conferences_query.limit(remaining_limit)
-                    elif per_table_limit:
-                        conferences_query = conferences_query.limit(per_table_limit)
                     if offset:
                         conferences_query = conferences_query.offset(offset // 2)
                     
@@ -162,16 +207,35 @@ async def get_events(
                     for conference in conferences_query.yield_per(100):
                         event = normalize_event_data(conference, "conference")
                         
+                        # Filter out past events unless specifically requested
+                        if not include_past and not is_event_future_only(event.start_date, event.end_date):
+                            continue
+                        
                         # Apply status filter efficiently
                         if status_filter and status_filter.lower() != "all":
                             if event.status.lower() != status_filter.lower():
                                 continue
                         
                         events.append(event)
-                        
-                        # Check limit early
-                        if limit and len(events) >= limit:
-                            break
+                
+                # Sort events by start date (closest first)
+                def get_sort_date(event):
+                    """Get date for sorting, with fallback"""
+                    parsed = parse_date_string(event.start_date)
+                    if parsed is None:
+                        return date.max  # Put events without dates at the end
+                    return parsed
+                
+                # Sort events: valid dates first (by date), then events without dates
+                events.sort(key=lambda event: (
+                    0 if parse_date_string(event.start_date) is not None else 1,  # Valid dates first
+                    get_sort_date(event),  # Then by date
+                    event.title  # Then by title as tiebreaker
+                ))
+                
+                # Apply final limit after sorting
+                if limit:
+                    events = events[:limit]
                 
                 return events
         
@@ -187,7 +251,7 @@ async def get_events(
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    return {"message": "Events API is running", "version": "1.0.0"}
+    return {"message": "Events API is running", "version": "1.0.1", "sorting": "updated"}
 
 @app.get("/health")
 async def health_check():

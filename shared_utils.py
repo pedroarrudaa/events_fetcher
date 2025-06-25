@@ -71,7 +71,7 @@ class Singleton(type):
             cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
 
-# Unified HTTP Client with sync/async capabilities
+# Unified HTTP Client with sync/async capabilities and concurrency control
 class HTTPClient(metaclass=Singleton):
     def __init__(self):
         self.session = self._create_session()
@@ -90,11 +90,18 @@ class HTTPClient(metaclass=Singleton):
         return self.session.get(url, timeout=kwargs.get('timeout', HTTP_TIMEOUT_STANDARD), **kwargs)
     
     @asynccontextmanager
-    async def async_session(self):
+    async def async_session(self, semaphore: Optional[asyncio.Semaphore] = None):
+        """Async session with optional semaphore for concurrency control."""
         if not self.connector:
             self.connector = aiohttp.TCPConnector(limit=50, limit_per_host=20)
-        async with aiohttp.ClientSession(connector=self.connector, headers={'User-Agent': ENHANCED_USER_AGENT}) as session:
-            yield session
+        
+        if semaphore:
+            async with semaphore:
+                async with aiohttp.ClientSession(connector=self.connector, headers={'User-Agent': ENHANCED_USER_AGENT}) as session:
+                    yield session
+        else:
+            async with aiohttp.ClientSession(connector=self.connector, headers={'User-Agent': ENHANCED_USER_AGENT}) as session:
+                yield session
 
 # External service clients
 class ServiceClients(metaclass=Singleton):
@@ -245,27 +252,51 @@ class EventProcessor:
         return event
 
 class WebScraper:
-    """Unified web scraping with retry logic and multiple backends."""
+    """Enhanced web scraper with async support and Crawl4AI integration."""
     
     def __init__(self):
         self.http = HTTPClient()
         self.clients = ServiceClients()
         self.crawl4ai_available = CRAWL4AI_AVAILABLE
     
-    async def scrape_async(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
-        """Async scraping with Crawl4AI support and automatic fallback."""
+    async def scrape_async(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False, 
+                          max_retries: int = 3, semaphore: Optional[asyncio.Semaphore] = None) -> Dict[str, Any]:
+        """Async scraping with Crawl4AI support, automatic fallback, and concurrency control."""
+        
+        # Apply semaphore if provided
+        if semaphore:
+            async with semaphore:
+                return await self._scrape_async_internal(url, use_crawl4ai, use_firecrawl, max_retries)
+        else:
+            return await self._scrape_async_internal(url, use_crawl4ai, use_firecrawl, max_retries)
+    
+    async def _scrape_async_internal(self, url: str, use_crawl4ai: bool = True, 
+                                   use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
+        """Internal async scraping method."""
         for attempt in range(max_retries):
             try:
                 # Try Crawl4AI first if available and enabled
                 if use_crawl4ai and self.crawl4ai_available:
-                    result = await crawl4ai_scrape_url(url, extract_structured=True)
-                    if result.get('success'):
-                        return {
-                            'success': True, 
-                            'content': result.get('markdown', result.get('content', '')),
-                            'structured_data': result,
-                            'method': 'crawl4ai'
-                        }
+                    try:
+                        result = await crawl4ai_scrape_url(url, extract_structured=True)
+                        if result.get('success'):
+                            return {
+                                'success': True, 
+                                'content': result.get('markdown', result.get('content', '')),
+                                'structured_data': result,
+                                'method': 'crawl4ai'
+                            }
+                    except Exception as crawl_error:
+                        # Check if it's an event loop related error
+                        error_str = str(crawl_error).lower()
+                        if 'event loop' in error_str or 'different event loop' in error_str:
+                            logger.log("warning", "Crawl4AI event loop error, disabling for this session", 
+                                     url=url, error=str(crawl_error))
+                            # Disable Crawl4AI for the rest of this session
+                            self.crawl4ai_available = False
+                        else:
+                            logger.log("warning", "Crawl4AI error, trying fallback", 
+                                     url=url, error=str(crawl_error))
                 
                 # Try FireCrawl if available and enabled
                 if use_firecrawl and self.clients.firecrawl:
@@ -285,6 +316,55 @@ class WebScraper:
                 time.sleep(2 ** attempt)
         
         return {'success': False, 'error': 'Max retries exceeded'}
+    
+    async def scrape_multiple_async(self, urls: List[str], max_concurrent: int = 5, 
+                                   use_crawl4ai: bool = True, use_firecrawl: bool = False) -> List[Dict[str, Any]]:
+        """
+        Scrape multiple URLs concurrently with proper semaphore management.
+        
+        Args:
+            urls: List of URLs to scrape
+            max_concurrent: Maximum number of concurrent requests
+            use_crawl4ai: Whether to use Crawl4AI
+            use_firecrawl: Whether to use FireCrawl
+            
+        Returns:
+            List of scraping results
+        """
+        if not urls:
+            return []
+        
+        print(f"🔍 Scraping {len(urls)} URLs concurrently (max_concurrent={max_concurrent})")
+        
+        # Create semaphore within the async context to ensure it's created in the same event loop
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        # Create tasks for all URLs
+        tasks = [
+            self.scrape_async(url, use_crawl4ai, use_firecrawl, semaphore=semaphore)
+            for url in urls
+        ]
+        
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle exceptions
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.log("error", "Async scraping failed", url=urls[i], error=str(result))
+                processed_results.append({
+                    'success': False,
+                    'error': str(result),
+                    'url': urls[i]
+                })
+            else:
+                processed_results.append(result)
+        
+        successful = sum(1 for r in processed_results if r.get('success', False))
+        print(f"✅ Scraping completed: {successful}/{len(urls)} successful")
+        
+        return processed_results
     
     def scrape(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
         """Unified scraping with automatic fallback (sync version)."""
@@ -348,10 +428,17 @@ class ContentEnricher:
             if not self.clients.openai:
                 return Event(url=url, name='OpenAI unavailable')
             
-            prompt = f"""Extract {self.event_type} details as JSON:
-{{"name": "event name", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "location": "location", 
-"city": "city", "remote": true/false, "description": "brief description", "speakers": [], 
-"ticket_price": "price", "is_paid": true/false, "themes": []}}"""
+            prompt = f"""Extract {self.event_type} details from the webpage content and return ONLY valid JSON.
+Focus on extracting accurate dates and locations. For dates, use YYYY-MM-DD format.
+For locations, be specific (city, state/country). Mark as remote only if explicitly virtual/online.
+
+Return this exact JSON structure:
+{{"name": "exact event name", "start_date": "YYYY-MM-DD or null", "end_date": "YYYY-MM-DD or null", 
+"location": "specific city, state/country or null", "city": "city name or null", 
+"remote": false, "description": "brief description", "speakers": [], 
+"ticket_price": "price or null", "is_paid": false, "themes": []}}
+
+If information is missing, use null not "TBD". Extract what you can find."""
             
             response = self.clients.openai.chat.completions.create(
                 model=GPT_MODEL_STANDARD,
@@ -360,11 +447,34 @@ class ContentEnricher:
                 temperature=0.1
             )
             
-            result = json.loads(response.choices[0].message.content.strip())
-            result['url'] = url
-            result['source'] = f'{self.event_type}_gpt'
+            response_text = response.choices[0].message.content.strip()
+            if not response_text:
+                logger.log("warning", "Empty OpenAI response", url=url)
+                return Event(url=url, name='Empty AI response')
             
-            return self.processor.normalize(result)
+            try:
+                # Clean the response - remove markdown code blocks if present
+                cleaned_response = response_text.strip()
+                if cleaned_response.startswith('```json'):
+                    cleaned_response = cleaned_response[7:]  # Remove ```json
+                if cleaned_response.startswith('```'):
+                    cleaned_response = cleaned_response[3:]   # Remove ```
+                if cleaned_response.endswith('```'):
+                    cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+                cleaned_response = cleaned_response.strip()
+                
+                result = json.loads(cleaned_response)
+                if not isinstance(result, dict):
+                    logger.log("warning", "OpenAI response not a dictionary", url=url, response=cleaned_response[:100])
+                    return Event(url=url, name='Invalid AI response format')
+                
+                result['url'] = url
+                result['source'] = f'{self.event_type}_gpt'
+                
+                return self.processor.normalize(result)
+            except json.JSONDecodeError as e:
+                logger.log("error", "Failed to parse OpenAI JSON response", url=url, error=str(e), response=response_text[:200])
+                return Event(url=url, name='AI parsing failed', metadata={'ai_response': response_text[:200]})
             
         except Exception as e:
             logger.log("error", "Enrichment failed", url=url, error=str(e))
@@ -493,52 +603,176 @@ class FileManager:
         return {'status': 'database_only', 'count': len(events)}
 
 class ParallelProcessor:
-    """Simplified parallel processing with automatic batching."""
+    """Simplified parallel processing utilities."""
     
     @staticmethod
     def process(items: List[Any], processor: Callable, max_workers: int = 10, batch_size: int = 50) -> List[Any]:
-        """Process items in parallel with automatic error handling."""
+        """
+        Process items in parallel using ThreadPoolExecutor.
+        
+        Args:
+            items: List of items to process
+            processor: Function to apply to each item
+            max_workers: Maximum number of worker threads
+            batch_size: Size of each batch (for progress tracking)
+            
+        Returns:
+            List of processed results
+        """
+        results = []
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Process in batches for better progress tracking
+            for i in range(0, len(items), batch_size):
+                batch = items[i:i + batch_size]
+                
+                # Submit batch tasks
+                future_to_item = {executor.submit(processor, item): item for item in batch}
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_item):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        logger.log("error", "Parallel processing failed", error=str(e))
+                        # Add failed item with error info
+                        item = future_to_item[future]
+                        results.append({'error': str(e), 'item': item})
+                
+                print(f"  Processed batch: {len(results)}/{len(items)} items")
+        
+        return results
+
+class ParallelAsyncProcessor:
+    """Async parallel processing utilities with semaphore management."""
+    
+    @staticmethod
+    async def process_async(items: List[Any], async_processor: Callable, 
+                           max_concurrent: int = 5, batch_size: int = 20) -> List[Any]:
+        """
+        Process items asynchronously with proper semaphore management.
+        
+        Args:
+            items: List of items to process
+            async_processor: Async function to apply to each item
+            max_concurrent: Maximum number of concurrent operations
+            batch_size: Size of each batch (for progress tracking)
+            
+        Returns:
+            List of processed results
+        """
         if not items:
             return []
         
+        print(f"🔄 Processing {len(items)} items asynchronously (max_concurrent={max_concurrent})")
+        
+        # Create semaphore within the async context to ensure it's created in the same event loop
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def process_with_semaphore(item):
+            """Process single item with semaphore control."""
+            async with semaphore:
+                try:
+                    return await async_processor(item)
+                except Exception as e:
+                    logger.log("error", "Async processing failed", error=str(e))
+                    return {'error': str(e), 'item': item}
+        
         results = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Process in batches
-            for i in range(0, len(items), batch_size):
-                batch = items[i:i + batch_size]
-                future_to_item = {executor.submit(processor, item): item for item in batch}
-                
-                for future in as_completed(future_to_item):
-                    try:
-                        if result := future.result():
-                            results.append(result)
-                    except Exception as e:
-                        logger.log("error", "Parallel processing error", error=str(e))
+        
+        # Process in batches for better progress tracking
+        for i in range(0, len(items), batch_size):
+            batch = items[i:i + batch_size]
+            print(f"  Processing batch {i//batch_size + 1}: {len(batch)} items")
+            
+            # Create tasks for the batch
+            tasks = [process_with_semaphore(item) for item in batch]
+            
+            # Execute batch concurrently
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle results and exceptions
+            for result in batch_results:
+                if isinstance(result, Exception):
+                    logger.log("error", "Batch processing error", error=str(result))
+                    results.append({'error': str(result), 'item': 'unknown'})
+                else:
+                    results.append(result)
+            
+            print(f"  Completed batch: {len(results)}/{len(items)} items")
+            
+            # Small delay between batches to be respectful to servers
+            if i + batch_size < len(items):
+                await asyncio.sleep(0.1)
+        
+        successful = sum(1 for r in results if not isinstance(r, dict) or 'error' not in r)
+        print(f"✅ Async processing completed: {successful}/{len(items)} successful")
         
         return results
 
 # Search query generator with concise implementation
 class QueryGenerator:
-    """Compact search query generator."""
+    """Enhanced search query generator for current, relevant conferences."""
     
     def __init__(self):
-        self.cities = ["San Francisco", "New York"]
+        self.cities = ["San Francisco", "New York", "San Francisco Bay Area", "NYC", "Manhattan", "Silicon Valley"]
         self.remote_terms = ["virtual", "remote", "online"]
         
     def generate(self, event_type: str, year: int = 2025) -> List[str]:
         """Generate search queries for event type."""
-        keywords = {
-            'conference': ["AI conference", "tech conference", "data science conference", "ML conference"],
-            'hackathon': ["hackathon", "coding competition", "tech challenge", "developer contest"]
-        }.get(event_type, [])
+        if event_type == 'conference':
+            # Core AI/Tech conference keywords
+            base_keywords = [
+                "AI conference", "artificial intelligence conference", "machine learning conference", 
+                "data science conference", "tech conference", "developer conference",
+                "ML summit", "AI summit", "tech summit", "software conference",
+                "startup conference", "innovation conference"
+            ]
+            
+            # SF/NY focused locations (PHYSICAL ONLY)
+            sf_locations = ["San Francisco", "San Francisco Bay Area", "Silicon Valley", "SF", "Palo Alto", "Mountain View"]
+            ny_locations = ["New York", "NYC", "Manhattan", "Brooklyn", "New York City"]
+            
+            queries = []
+            
+            # Generate targeted location-based searches (NO VIRTUAL)
+            for keyword in base_keywords:
+                # San Francisco area
+                for location in sf_locations:
+                    queries.append(f'"{keyword}" {location} {year}')
+                    queries.append(f'{keyword} {location} {year}')
+                
+                # New York area  
+                for location in ny_locations:
+                    queries.append(f'"{keyword}" {location} {year}')
+                    queries.append(f'{keyword} {location} {year}')
+            
+            # Add specific high-value tech conferences with location
+            specific_conferences = [
+                f"NeurIPS {year} San Francisco", f"ICML {year} New York", f"ICLR {year} San Francisco",
+                f"TechCrunch Disrupt {year} San Francisco", f"AI Summit {year} New York", 
+                f"Strata Data Conference {year} San Francisco", f"O'Reilly AI Conference {year}",
+                f"Google I/O {year} San Francisco", f"Microsoft Build {year} New York"
+            ]
+            queries.extend(specific_conferences)
+            
+            # Add platform-specific searches for SF/NY
+            for location in sf_locations + ny_locations:
+                queries.append(f"eventbrite.com AI conference {location} {year}")
+                queries.append(f"meetup.com tech conference {location} {year}")
+            
+        else:  # hackathon
+            keywords = ["hackathon", "coding competition", "tech challenge", "developer contest"]
+            sf_locations = ["San Francisco", "Silicon Valley", "SF", "Palo Alto"]
+            ny_locations = ["New York", "NYC", "Manhattan", "Brooklyn"]
+            queries = []
+            for keyword in keywords:
+                for city in sf_locations + ny_locations:
+                    queries.append(f"{keyword} {city} {year}")
+                queries.append(f'"{keyword}" {year}')
         
-        queries = []
-        for keyword in keywords:
-            queries.extend([f"{keyword} {city} {year}" for city in self.cities])
-            queries.extend([f"{keyword} {remote} {year}" for remote in self.remote_terms])
-            queries.append(f'"{keyword}" {year}')
-        
-        return queries
+        return queries  # Remove the limit - let the discovery function handle limits
 
 # Utility functions
 def validate_date(date_str: str) -> Optional[str]:

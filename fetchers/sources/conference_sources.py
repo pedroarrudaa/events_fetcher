@@ -43,21 +43,52 @@ class UnifiedConferenceSources:
         
         # Configuration
         self.trusted_domains = {
-            'eventbrite.com': 0.9, 'meetup.com': 0.8, 'ieee.org': 0.95,
-            'acm.org': 0.95, 'oreilly.com': 0.9, 'techcrunch.com': 0.85,
-            'ai4.io': 0.8, 'marktechpost.com': 0.7, 'techmeme.com': 0.75
+            'lu.ma': 0.95, 'eventbrite.com': 0.9, 'meetup.com': 0.8, 
+            'ieee.org': 0.95, 'acm.org': 0.95, 'oreilly.com': 0.9, 
+            'techcrunch.com': 0.85, 'aiml.events': 0.85, 'techmeme.com': 0.75,
+            'luma.com': 0.8, 'conference.com': 0.7, 'tech.events': 0.8
         }
+        
+        # Target locations - conferences must be in these areas (NO VIRTUAL/REMOTE)
+        self.target_locations = [
+            # San Francisco area
+            'san francisco', 'sf',
+            # New York area  
+            'new york', 'nyc', 'manhattan', 'brooklyn', 'queens', 'bronx',
+            'new york city', 'ny',
+        ]
+        
+        # Excluded locations/terms - these will be filtered out
+        self.excluded_locations = [
+            'virtual', 'online', 'remote', 'worldwide', 'global', 'digital',
+            'webinar', 'livestream', 'streaming', 'zoom', 'teams'
+        ]
         
         self.conference_sites = [
             {
-                'name': 'AI4',
-                'url': 'https://ai4.io/',
-                'selectors': ['div[class*="event"]', 'div[class*="conference"]', '.card']
+                'name': 'Eventbrite AI SF',
+                'url': 'https://www.eventbrite.com/d/ca--san-francisco/artificial-intelligence/',
+                'selectors': ['.event-card', '.eds-event-card', '[data-event-id]']
             },
             {
-                'name': 'MarkTechPost Events',
-                'url': 'https://events.marktechpost.com/',
-                'selectors': ['div[class*="event"]', 'article', '.post']
+                'name': 'Meetup SF AI',
+                'url': 'https://www.meetup.com/find/?keywords=artificial%20intelligence&location=San%20Francisco%2C%20CA',
+                'selectors': ['.event-item', '[data-event-id]', '.search-result']
+            },
+            {
+                'name': 'Luma AI SF',
+                'url': 'https://lu.ma/discover?dates=upcoming&location=San+Francisco%2C+CA&q=AI',
+                'selectors': ['.event-card', '[data-event]', '.event-item', 'article']
+            },
+            {
+                'name': 'Luma AI NYC',
+                'url': 'https://lu.ma/discover?dates=upcoming&location=New+York%2C+NY&q=AI',
+                'selectors': ['.event-card', '[data-event]', '.event-item', 'article']
+            },
+            {
+                'name': 'AI ML Events',
+                'url': 'https://aiml.events/',
+                'selectors': ['.event-card', '.event-item', '[data-event]', 'article']
             },
             {
                 'name': 'TechMeme Events',
@@ -67,80 +98,176 @@ class UnifiedConferenceSources:
         ]
         
         self.conference_keywords = [
-            'conference', 'summit', 'symposium', 'workshop', 'expo',
-            'ai', 'artificial intelligence', 'machine learning', 'data science'
+            # Event types
+            'conference', 'summit', 'symposium', 'workshop', 'expo', 'meetup', 'demo day',
+            # GenAI specific terms (perfect for your calendar)
+            'generative ai', 'genai', 'llm', 'large language model', 'chatgpt', 'gpt',
+            'foundation models', 'transformer', 'prompt engineering', 'ai agent',
+            # Broader AI terms
+            'artificial intelligence', 'machine learning', 'deep learning', 'neural network',
+            'ai research', 'ai safety', 'ai ethics', 'ai startup', 'ai developer',
+            # Tech/startup ecosystem
+            'tech', 'technology', 'startup', 'innovation', 'developer', 'founder',
+            'venture capital', 'demo day', 'pitch', 'product launch'
         ]
     
     @performance_monitor
-    def discover_all_conferences(self, max_results: int = 50) -> List[Dict[str, Any]]:
+    def discover_all_conferences(self, max_results: int = 200) -> List[Dict[str, Any]]:
         """
-        Discover conferences from all available sources.
+        Discover conferences from all available sources with early stopping.
         
         Args:
-            max_results: Maximum number of conferences to return
+            max_results: Maximum number of conferences to return (controls processing)
             
         Returns:
             List of conference dictionaries
         """
-        logger.log("info", "Starting unified conference discovery")
+        logger.log("info", f"Starting efficient conference discovery (target: {max_results})")
         all_conferences = []
         
-        # 1. Tavily search
-        if self.tavily_client:
-            tavily_results = self._search_with_tavily()
+        # 1. Quick site scraping first (usually fast)
+        if len(all_conferences) < max_results:
+            site_results = self._scrape_conference_sites()
+            all_conferences.extend(site_results)
+            logger.log("info", f"Site scraping found {len(site_results)} conferences")
+        
+        # 2. Efficient Tavily search with early stopping
+        if len(all_conferences) < max_results and self.tavily_client:
+            remaining_needed = max_results - len(all_conferences)
+            tavily_results = self._search_with_tavily_limited(remaining_needed)
             all_conferences.extend(tavily_results)
             logger.log("info", f"Tavily search found {len(tavily_results)} conferences")
         
-        # 2. Specific site scraping
-        site_results = self._scrape_conference_sites()
-        all_conferences.extend(site_results)
-        logger.log("info", f"Site scraping found {len(site_results)} conferences")
-        
-        # 3. Expand any aggregator URLs found
-        expanded_results = self._expand_aggregators(all_conferences)
-        all_conferences = expanded_results
+        # 3. Expand aggregators only if needed
+        if len(all_conferences) < max_results:
+            expanded_results = self._expand_aggregators(all_conferences)
+            all_conferences = expanded_results
         
         # 4. Deduplicate and rank
         unique_conferences = self._deduplicate_and_rank(all_conferences)
         
-        # 5. Limit results
-        final_results = unique_conferences[:max_results]
+        # 5. Apply final limit
+        final_results = unique_conferences[:max_results] if max_results else unique_conferences
         
-        logger.log("info", f"Conference discovery completed", 
+        logger.log("info", f"Efficient discovery completed", 
                   total_found=len(all_conferences), 
                   unique=len(unique_conferences), 
-                  final=len(final_results))
+                  final=len(final_results),
+                  target=max_results,
+                  efficiency=f"{len(final_results)}/{max_results}")
         
         return final_results
     
-    def _search_with_tavily(self) -> List[Dict[str, Any]]:
-        """Search for conferences using Tavily."""
+    def _search_with_tavily_limited(self, max_conferences: int) -> List[Dict[str, Any]]:
+        """Search for conferences using Tavily with early stopping."""
         if not self.tavily_client:
             return []
         
         conferences = []
-        queries = self.query_generator.generate('conference', 2025)[:8]  # Limit queries
+        queries = self._generate_efficient_queries()  # Use smart query generation
         
-        for query in queries:
+        print(f" Efficient Tavily search (target: {max_conferences} conferences, {len(queries)} queries max)")
+        
+        for i, query in enumerate(queries, 1):
+            # Early stopping - we have enough conferences
+            if len(conferences) >= max_conferences:
+                print(f"🎯 Target reached! Stopping at {len(conferences)} conferences (query {i-1}/{len(queries)})")
+                break
+                
             try:
+                print(f"  Query {i}: {query}")
+                    
                 response = self.tavily_client.search(
                     query=query,
                     search_depth="basic",
-                    max_results=5,
+                    max_results=6,  # Moderate results per query
                     include_domains=list(self.trusted_domains.keys())
                 )
                 
+                query_results = 0
                 for result in response.get('results', []):
                     conference = self._process_search_result(result, 'tavily', query)
-                    if conference:
+                    if conference and self._is_target_location(conference):
                         conferences.append(conference)
+                        query_results += 1
+                        
+                        # Stop this query if we have enough
+                        if len(conferences) >= max_conferences:
+                            break
                 
-                time.sleep(0.5)  # Rate limiting
+                print(f"    Found {query_results} valid conferences (total: {len(conferences)})")
+                time.sleep(0.4)  # Rate limiting
                 
             except Exception as e:
                 logger.log("error", f"Tavily search failed for query: {query}", error=str(e))
         
+        print(f" Efficient Tavily search completed: {len(conferences)} conferences found")
         return conferences
+    
+    def _generate_efficient_queries(self) -> List[str]:
+        """Generate a smaller set of high-quality queries."""
+        # Start with the most effective queries based on our debug results
+        core_queries = [
+            # Generative AI focused searches (perfect for your calendar)
+            '"generative AI conference" San Francisco 2025',
+            '"LLM conference" San Francisco 2025',
+            '"ChatGPT conference" Bay Area 2025',
+            '"AI startup" conference San Francisco 2025',
+            '"foundation models" conference SF 2025',
+            
+            # Platform-specific searches for GenAI
+            'eventbrite.com "generative AI" San Francisco 2025',
+            'eventbrite.com "LLM" Bay Area 2025',
+            'eventbrite.com "AI developer" San Francisco 2025',
+            'meetup.com "generative AI" San Francisco',
+            'lu.ma "AI conference" San Francisco 2025',
+            'lu.ma "generative AI" New York 2025',
+            'lu.ma "LLM meetup" Bay Area 2025',
+            
+            # Company/brand specific (high-value for GenAI calendar)
+            'OpenAI DevDay 2025 San Francisco',
+            'Anthropic conference 2025',
+            'Google AI conference San Francisco 2025',
+            'Microsoft AI conference Bay Area 2025',
+            'Meta AI conference Silicon Valley 2025',
+            'NVIDIA AI conference 2025',
+            
+            # Developer/researcher focused
+            '"AI research conference" Stanford 2025',
+            '"AI developer conference" San Francisco 2025',
+            '"prompt engineering conference" Bay Area 2025',
+            '"AI safety conference" Silicon Valley 2025',
+            
+            # Startup ecosystem (relevant for GenAI SF community)
+            'AI startup demo day San Francisco 2025',
+            'YCombinator AI demo day 2025',
+            'TechCrunch AI Disrupt 2025'
+        ]
+        
+        return core_queries
+    
+    def _is_target_location(self, conference: Dict[str, Any]) -> bool:
+        """Check if conference is in target locations (SF/NY PHYSICAL ONLY)."""
+        # Check in title, description, and any location field
+        text_to_check = ' '.join([
+            conference.get('name', '').lower(),
+            conference.get('description', '').lower(),
+            conference.get('location', '').lower(),
+            conference.get('url', '').lower()
+        ])
+        
+        # First, exclude any virtual/remote conferences
+        for excluded in self.excluded_locations:
+            if excluded in text_to_check:
+                return False
+        
+        # Then, check if it mentions any target location
+        for location in self.target_locations:
+            if location in text_to_check:
+                return True
+        
+        # If no location is found, exclude it (we only want explicitly located conferences)
+        return False
     
     def _scrape_conference_sites(self) -> List[Dict[str, Any]]:
         """Scrape specific conference websites."""
@@ -340,7 +467,7 @@ class UnifiedConferenceSources:
 
 # Main discovery function
 @performance_monitor
-def discover_conferences(max_results: int = 50) -> List[Dict[str, Any]]:
+def discover_conferences(max_results: int = 200) -> List[Dict[str, Any]]:
     """
     Main function to discover conferences from all sources.
     

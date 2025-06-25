@@ -7,6 +7,7 @@ import os
 import re
 import time
 import json
+import requests
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse, urljoin
@@ -18,12 +19,237 @@ from shared_utils import (
 )
 
 
+def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
+    """
+    Fetch open hackathons from Devpost public API with AI search filter and SF/NY/Online location filtering.
+    
+    Args:
+        pages: Number of pages to fetch (default: 1)
+        
+    Returns:
+        List of hackathon dictionaries with title, url, submission_deadline, location, and online
+    """
+    hackathons = []
+    base_url = "https://devpost.com/api/hackathons"
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://devpost.com/hackathons',
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+    
+    # Target locations for filtering
+    target_locations = [
+        'san francisco', 'sf', 'bay area', 'silicon valley', 'california', 'ca',
+        'new york', 'ny', 'nyc', 'new york city', 'manhattan', 'brooklyn',
+        'online', 'virtual', 'remote', 'worldwide', 'global'
+    ]
+    
+    # Online indicators for hackathons that don't explicitly mark online=true
+    online_indicators = [
+        'online', 'virtual', 'remote', 'global', 'worldwide', 'digital',
+        'internet', 'from home', 'anywhere'
+    ]
+    
+    # First try to get hackathons with AI search
+    for page in range(1, pages + 1):
+        try:
+            params = {
+                'search': 'ai',  # Filter for AI-related hackathons
+                'page': page,
+                'per_page': 20,  # Standard page size
+                'status[]': 'open'  # Only open hackathons
+            }
+            
+            logger.log("info", f"Fetching Devpost AI hackathons page {page}")
+            
+            response = requests.get(base_url, headers=headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Extract hackathons from response
+                if 'hackathons' in data:
+                    hackathons_data = data['hackathons']
+                elif isinstance(data, list):
+                    hackathons_data = data
+                else:
+                    hackathons_data = data.get('data', [])
+                
+                if not hackathons_data:
+                    logger.log("info", f"No more hackathons found on page {page}")
+                    break
+                
+                for item in hackathons_data:
+                    try:
+                        location = item.get('location', '').strip().lower()
+                        online = item.get('online', False)
+                        title = item.get('title', '').strip().lower()
+                        
+                        # Check if hackathon is online based on multiple indicators
+                        is_online = (
+                            online or
+                            any(indicator in location for indicator in online_indicators) or
+                            any(indicator in title for indicator in online_indicators) or
+                            location == ''  # Empty location often means online
+                        )
+                        
+                        # Check if hackathon matches our target locations
+                        is_target_location = (
+                            is_online or  # Include if determined to be online
+                            any(target in location for target in target_locations)
+                        )
+                        
+                        if not is_target_location:
+                            continue  # Skip hackathons not in target locations
+                        
+                        hackathon = {
+                            'title': item.get('title', '').strip(),
+                            'url': item.get('url', '').strip(),
+                            'submission_deadline': item.get('submission_deadline', ''),
+                            'location': item.get('location', '').strip(),
+                            'online': is_online,  # Use our calculated online status
+                            'source': 'Devpost',
+                            'quality_score': 0.9,
+                            'discovered_at': datetime.now().isoformat()
+                        }
+                        
+                        # Clean up URL
+                        if hackathon['url'] and not hackathon['url'].startswith('http'):
+                            hackathon['url'] = f"https://devpost.com{hackathon['url']}"
+                        
+                        # Only add valid hackathons
+                        if hackathon['title'] and hackathon['url']:
+                            hackathons.append(hackathon)
+                            logger.log("info", f"Added hackathon: {hackathon['title']} (Location: {hackathon['location']}, Online: {hackathon['online']})")
+                            
+                    except Exception as e:
+                        logger.log("error", f"Error processing hackathon item: {str(e)}")
+                        continue
+                
+                logger.log("info", f"Fetched {len(hackathons_data)} hackathons from page {page}")
+                
+                # Rate limiting between pages
+                if page < pages:
+                    time.sleep(1)
+                    
+            elif response.status_code == 429:
+                logger.log("warning", "Rate limited by Devpost API")
+                time.sleep(5)  # Wait longer for rate limits
+                break
+            else:
+                logger.log("warning", f"Devpost API returned status {response.status_code}")
+                break
+                
+        except requests.exceptions.RequestException as e:
+            logger.log("error", f"Request error on page {page}: {str(e)}")
+            break
+        except Exception as e:
+            logger.log("error", f"Unexpected error on page {page}: {str(e)}")
+            break
+    
+    # Also search specifically for SF and NY hackathons
+    specific_searches = [
+        {'search': 'hackathon', 'location': 'San Francisco'},
+        {'search': 'hackathon', 'location': 'New York'},
+        {'search': 'ai hackathon online', 'location': ''},
+    ]
+    
+    for search_params in specific_searches:
+        try:
+            params = {
+                'search': search_params['search'],
+                'page': 1,
+                'per_page': 10,
+                'status[]': 'open'
+            }
+            
+            if search_params['location']:
+                params['location'] = search_params['location']
+            
+            logger.log("info", f"Searching specifically for: {search_params}")
+            
+            response = requests.get(base_url, headers=headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Extract hackathons from response
+                if 'hackathons' in data:
+                    hackathons_data = data['hackathons']
+                elif isinstance(data, list):
+                    hackathons_data = data
+                else:
+                    hackathons_data = data.get('data', [])
+                
+                for item in hackathons_data:
+                    try:
+                        location = item.get('location', '').strip().lower()
+                        online = item.get('online', False)
+                        title = item.get('title', '').strip().lower()
+                        
+                        # Check if hackathon is online based on multiple indicators
+                        is_online = (
+                            online or
+                            any(indicator in location for indicator in online_indicators) or
+                            any(indicator in title for indicator in online_indicators) or
+                            location == ''  # Empty location often means online
+                        )
+                        
+                        # Check if hackathon matches our target locations
+                        is_target_location = (
+                            is_online or  # Include if determined to be online
+                            any(target in location for target in target_locations)
+                        )
+                        
+                        if not is_target_location:
+                            continue  # Skip hackathons not in target locations
+                        
+                        url = item.get('url', '').strip()
+                        if url and not url.startswith('http'):
+                            url = f"https://devpost.com{url}"
+                        
+                        # Check for duplicates
+                        if any(h['url'] == url for h in hackathons):
+                            continue
+                        
+                        hackathon = {
+                            'title': item.get('title', '').strip(),
+                            'url': url,
+                            'submission_deadline': item.get('submission_deadline', ''),
+                            'location': item.get('location', '').strip(),
+                            'online': is_online,  # Use our calculated online status
+                            'source': 'Devpost',
+                            'quality_score': 0.9,
+                            'discovered_at': datetime.now().isoformat()
+                        }
+                        
+                        if hackathon['title'] and hackathon['url']:
+                            hackathons.append(hackathon)
+                            logger.log("info", f"Added from specific search: {hackathon['title']} (Location: {hackathon['location']}, Online: {hackathon['online']})")
+                            
+                    except Exception as e:
+                        logger.log("error", f"Error processing specific search item: {str(e)}")
+                        continue
+                        
+            time.sleep(1)  # Rate limiting
+            
+        except Exception as e:
+            logger.log("error", f"Error in specific search: {str(e)}")
+            continue
+    
+    logger.log("info", f"Total hackathons fetched from Devpost API: {len(hackathons)} (filtered for SF/NY/Online)")
+    return hackathons
+
+
 class UnifiedHackathonSources:
     """
     Unified hackathon discovery from all sources.
     
-    Combines Devpost, Eventbrite, MLH, Hackathon.com, and HackerEarth
-    into a single clean interface.
+    Combines Devpost API, Eventbrite, and MLH into a single clean interface.
+    Removed problematic sources: HackerEarth and Hackathon.com
     """
     
     def __init__(self):
@@ -32,20 +258,22 @@ class UnifiedHackathonSources:
         self.enricher = EventGPTExtractor('hackathon')
         self.query_generator = QueryGenerator()
         
-        # Source configurations
+        # Source configurations - Removed HackerEarth and Hackathon.com
         self.sources = [
             {
                 'name': 'Devpost',
                 'base_url': 'https://devpost.com',
+                'use_api': True,
                 'search_urls': ['https://devpost.com/hackathons'],
                 'url_patterns': ['/hackathons/'],
                 'keywords': ['hackathon', 'hack', 'challenge', 'contest'],
                 'max_pages': 5,
-                'reliability': 0.9
+                'reliability': 0.95  # Higher reliability with API
             },
             {
                 'name': 'MLH',
                 'base_url': 'https://mlh.io',
+                'use_api': False,
                 'search_urls': ['https://mlh.io/seasons/2025/events'],
                 'url_patterns': ['/events/', '/event/'],
                 'keywords': ['hackathon', 'hack', 'mlh'],
@@ -55,6 +283,7 @@ class UnifiedHackathonSources:
             {
                 'name': 'Eventbrite',
                 'base_url': 'https://www.eventbrite.com',
+                'use_api': False,
                 'search_urls': [
                     'https://www.eventbrite.com/d/online/hackathon',
                     'https://www.eventbrite.com/d/online/hack',
@@ -64,27 +293,6 @@ class UnifiedHackathonSources:
                 'keywords': ['hackathon', 'hack', 'coding', 'programming'],
                 'max_pages': 3,
                 'reliability': 0.7
-            },
-            {
-                'name': 'HackerEarth',
-                'base_url': 'https://www.hackerearth.com',
-                'search_urls': [
-                    'https://www.hackerearth.com/challenges/hackathon/',
-                    'https://www.hackerearth.com/challenges/'
-                ],
-                'url_patterns': ['/challenges/', '/challenge/'],
-                'keywords': ['hackathon', 'challenge', 'coding', 'programming'],
-                'max_pages': 3,
-                'reliability': 0.8
-            },
-            {
-                'name': 'Hackathon.com',
-                'base_url': 'https://www.hackathon.com',
-                'search_urls': ['https://www.hackathon.com/events'],
-                'url_patterns': ['/events/'],
-                'keywords': ['hackathon', 'event', 'challenge'],
-                'max_pages': 3,
-                'reliability': 0.6
             }
         ]
         
@@ -109,7 +317,11 @@ class UnifiedHackathonSources:
         
         for source_config in self.sources:
             try:
-                source_hackathons = self._scrape_source(source_config)
+                if source_config.get('use_api', False):
+                    source_hackathons = self._scrape_api_source(source_config)
+                else:
+                    source_hackathons = self._scrape_source(source_config)
+                    
                 all_hackathons.extend(source_hackathons)
                 logger.log("info", f"{source_config['name']} found {len(source_hackathons)} hackathons")
                 
@@ -131,6 +343,40 @@ class UnifiedHackathonSources:
                   final=len(final_results))
         
         return final_results
+    
+    def _scrape_api_source(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Scrape a source using its API endpoint."""
+        hackathons = []
+        source_name = source_config['name']
+        
+        logger.log("info", f"Using API for {source_name}")
+        
+        try:
+            if source_name == 'Devpost':
+                hackathons = self._fetch_devpost_api_hackathons(source_config)
+            
+        except Exception as e:
+            logger.log("error", f"API error for {source_name}", error=str(e))
+            # Fallback to regular scraping if API fails
+            logger.log("info", f"Falling back to regular scraping for {source_name}")
+            hackathons = self._scrape_source(source_config)
+        
+        return hackathons
+    
+    def _fetch_devpost_api_hackathons(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Fetch hackathons from Devpost API."""
+        hackathons = []
+        
+        try:
+            # Use the official Devpost API
+            hackathons = fetch_devpost_hackathons(pages=3)  # Fetch up to 3 pages
+                
+        except Exception as e:
+            logger.log("error", f"Devpost API error: {str(e)}")
+            
+        return hackathons
+    
+
     
     def _scrape_source(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Scrape a single hackathon source."""
@@ -332,14 +578,4 @@ def get_eventbrite_hackathons() -> List[Dict[str, Any]]:
 def get_mlh_hackathons() -> List[Dict[str, Any]]:
     """Legacy compatibility for mlh.py."""
     hackathons = discover_hackathons(60)
-    return [h for h in hackathons if h.get('source') == 'mlh']
-
-def get_hackathon_com_hackathons() -> List[Dict[str, Any]]:
-    """Legacy compatibility for hackathon_com.py."""
-    hackathons = discover_hackathons(60)
-    return [h for h in hackathons if h.get('source') == 'hackathon.com']
-
-def get_hackerearth_hackathons() -> List[Dict[str, Any]]:
-    """Legacy compatibility for hackerearth.py."""
-    hackathons = discover_hackathons(60)
-    return [h for h in hackathons if h.get('source') == 'hackerearth'] 
+    return [h for h in hackathons if h.get('source') == 'mlh'] 

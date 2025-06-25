@@ -18,6 +18,7 @@ from fetchers.sources.conference_sources import discover_conferences
 from fetchers.sources.hackathon_sources import discover_hackathons
 from fetchers.enrichers.conference_gpt_extractor import enrich_conference_data
 from fetchers.enrichers.hackathon_gpt_extractor import enrich_hackathon_data
+from event_filters import filter_future_target_events
 
 
 EventType = Literal['conference', 'hackathon']
@@ -42,7 +43,7 @@ class UnifiedEventFetcher:
         self.config = {
             'conference': {
                 'discover_func': discover_conferences,
-                'max_results': 50,
+                'max_results': 200,
                 'table_name': 'conferences'
             },
             'hackathon': {
@@ -52,16 +53,19 @@ class UnifiedEventFetcher:
             }
         }[event_type]
     
-    def fetch_all_events(self) -> List[Dict[str, Any]]:
+    def fetch_all_events(self, target_limit: int = None) -> List[Dict[str, Any]]:
         """
-        Fetch events from all sources using unified framework.
+        Fetch events from all sources using unified framework with smart limiting.
         """
-        print(f"Starting unified {self.event_type} fetching...")
+        print(f"Starting efficient {self.event_type} fetching...")
         
         try:
-            # Use the unified discovery function
-            events = self.config['discover_func'](max_results=self.config['max_results'])
-            print(f"Found {len(events)} {self.event_type}s from unified sources")
+            # Use target limit if provided, otherwise use config default
+            effective_limit = target_limit if target_limit else self.config['max_results']
+            
+            # Use the unified discovery function with smart limiting
+            events = self.config['discover_func'](max_results=effective_limit)
+            print(f"Found {len(events)} {self.event_type}s from unified sources (target: {effective_limit})")
             return events
         except Exception as e:
             print(f"Error fetching {self.event_type}s: {str(e)}")
@@ -98,11 +102,15 @@ class UnifiedEventFetcher:
                 
                 if event_obj and hasattr(event_obj, '__dict__'):
                     details = event_obj.__dict__
-                    # Clean up None values and empty strings
-                    details = {k: v for k, v in details.items() if v is not None and v != ''}
+                    # Clean up unwanted values but preserve None for optional fields
+                    cleaned_details = {}
+                    for k, v in details.items():
+                        # Keep all values except empty strings and certain metadata fields
+                        if v != '' and k not in ['enrichment_status', 'enrichment_error', 'metadata']:
+                            cleaned_details[k] = v
                     
                     # Merge with original event data (prioritize enriched data)
-                    enriched = {**event, **details}
+                    enriched = {**event, **cleaned_details}
                     enriched['enrichment_status'] = 'success'
                     print(f"DEBUG: Successfully enriched {name[:30]}...")
                     return enriched
@@ -180,8 +188,8 @@ def run_event_fetcher(event_type: EventType, limit: int = None):
         # Initialize unified fetcher
         fetcher = UnifiedEventFetcher(event_type)
         
-        # Fetch events from all sources
-        all_events = fetcher.fetch_all_events()
+        # Fetch events from all sources with early stopping
+        all_events = fetcher.fetch_all_events(target_limit=limit)
         
         if not all_events:
             print(f"No {event_type}s found from any source.")
@@ -191,18 +199,24 @@ def run_event_fetcher(event_type: EventType, limit: int = None):
         unique_events = fetcher.deduplicate_events(all_events)
         print(f"After deduplication: {len(unique_events)} unique {event_type}s")
         
-        # Apply limit if specified
-        if limit and limit > 0:
-            unique_events = unique_events[:limit]
-            print(f"Applied limit: processing {len(unique_events)} {event_type}s")
+        # Filter for future events only (remove past events)
+        future_events = filter_future_target_events(unique_events, event_type)
+        print(f"After date filtering: {len(future_events)} future {event_type}s (removed {len(unique_events) - len(future_events)} past events)")
         
-        # Save to database using bulk operations
-        print(f"Saving {event_type}s to database...")
-        save_results = bulk_save_to_db(unique_events, fetcher.config['table_name'])
+        # Apply final limit if needed (should rarely be needed now)
+        if limit and limit > 0 and len(future_events) > limit:
+            future_events = future_events[:limit]
+            print(f"Applied final limit: processing {len(future_events)} {event_type}s")
+        else:
+            print(f"Processing all {len(future_events)} {event_type}s (within target limit)")
+        
+        # Enrich events with parallel processing BEFORE saving to database
+        enriched_events = fetcher.enrich_events_parallel(future_events)
+        
+        # Save enriched events to database using bulk operations
+        print(f"Saving enriched {event_type}s to database...")
+        save_results = bulk_save_to_db(enriched_events, fetcher.config['table_name'], update_existing=True)
         print(f"Database save results: {save_results}")
-        
-        # Enrich events with parallel processing
-        enriched_events = fetcher.enrich_events_parallel(unique_events)
         
         # Log processing completion (data already in database)
         result = fetcher.save_events(enriched_events)

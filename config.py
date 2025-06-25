@@ -1,9 +1,11 @@
 # Configuration constants to replace magic numbers throughout the project
 # This file consolidates all hard-coded values for better maintainability
 
+import os
+
 # HTTP Configuration
 HTTP_TIMEOUT_SHORT = 10         # Short timeout for quick requests
-HTTP_TIMEOUT_STANDARD = 30      # Standard timeout for most requests
+HTTP_TIMEOUT_STANDARD = 15      # Standard timeout for most requests
 HTTP_TIMEOUT_LONG = 60          # Long timeout for heavy requests
 
 # HTTP Connection Pooling and Retry Configuration
@@ -12,7 +14,7 @@ HTTP_BACKOFF_FACTOR = 0.3       # Backoff factor for retries
 HTTP_BACKOFF_INITIAL = 1        # Initial backoff time in seconds
 
 # Enhanced User Agent for better request handling
-ENHANCED_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+ENHANCED_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 # API Configuration
 OPENAI_TIMEOUT_READ = 60.0
@@ -21,10 +23,12 @@ OPENAI_TIMEOUT_CONNECT = 10.0
 
 # GPT Processing Configuration
 GPT_MODEL_STANDARD = "gpt-3.5-turbo"          # Standard GPT model
+GPT_MODEL_ADVANCED = "gpt-4"
 GPT_TEMPERATURE_STANDARD = 0.1                 # Low temperature for consistent extraction
 GPT_TIMEOUT_STANDARD = 60                      # GPT request timeout
 GPT_MAX_CONTENT_CHARS = 12000                  # Conservative limit for GPT content
-GPT_MAX_TOKENS_STANDARD = 1500                 # Standard token limit
+GPT_MAX_TOKENS_STANDARD = 1000                 # Standard token limit
+GPT_MAX_TOKENS_ADVANCED = 2000                 # Advanced token limit
 GPT_MAX_TOKENS_REDUCED = 1000                  # Reduced token limit
 GPT_MAX_TOKENS_MINIMAL = 800                   # Minimal token limit
 GPT_TEMPERATURE = 0.1                          # Low temperature for consistent extraction
@@ -67,7 +71,7 @@ MAX_QUALITY_EXAMPLES = 3        # Maximum quality examples
 # Filtering Configuration  
 MAX_SPEAKERS_LIMIT = 5          # Maximum speakers to keep
 MAX_CONTENT_FOR_DATES = 8000    # Maximum content length for date extraction
-MAX_CONTENT_FOR_PARSING = 5000  # Maximum content length for basic parsing
+MAX_CONTENT_FOR_PARSING = 50000  # Maximum content length for basic parsing
 
 # File Processing
 MAX_HTML_SIZE_LOG = None        # No limit on HTML size logging (use actual size)
@@ -91,3 +95,78 @@ MIN_DATA_COMPLETENESS = 0.3       # Minimum data completeness required
 MAX_CONCURRENT_EXTRACTIONS = 5   # Maximum concurrent GPT extractions
 DEFAULT_BATCH_SIZE = 10          # Default batch size for parallel processing
 DEFAULT_MAX_WORKERS = 5          # Default maximum workers for thread pools 
+
+# Additional headers to avoid bot detection
+DEFAULT_HEADERS = {
+    'User-Agent': ENHANCED_USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'DNT': '1',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"'
+}
+
+# Database configuration
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///events_dashboard.db')
+
+# File paths
+EVENTS_DIR = "data"
+CONFERENCES_FILE = f"{EVENTS_DIR}/conferences.json"
+HACKATHONS_FILE = f"{EVENTS_DIR}/hackathons.json"
+
+# Event processing
+DEDUPE_THRESHOLD = 0.85
+QUALITY_THRESHOLD = 0.3
+
+# Geographic filters
+TARGET_LOCATIONS = [
+    'san francisco', 'sf', 'silicon valley', 'bay area',
+    'new york', 'nyc', 'manhattan', 'brooklyn', 'new york city'
+]
+
+EXCLUDED_TERMS = [
+    'virtual', 'online', 'remote', 'webinar', 'digital',
+    'livestream', 'streaming', 'zoom', 'teams', 'worldwide'
+]
+
+# API Configuration
+FIRECRAWL_MAX_RETRIES = 2
+FIRECRAWL_TIMEOUT = 30
+
+# Parallel processing
+MAX_WORKERS_DEFAULT = 5
+BATCH_SIZE_DEFAULT = 10
+
+# Discovery limits
+MAX_CONFERENCES_DEFAULT = 200
+MAX_HACKATHONS_DEFAULT = 60
+
+# Site-specific configuration
+CONFERENCE_SITES = [
+    {
+        'name': 'Eventbrite',
+        'base_url': 'https://www.eventbrite.com',
+        'search_path': '/d/ca--san-francisco/conferences/',
+        'selectors': ['.event-card', '.card-container', '[data-event-id]']
+    },
+    {
+        'name': 'Meetup',
+        'base_url': 'https://www.meetup.com',
+        'search_path': '/find/events/?keywords=conference&location=San+Francisco',
+        'selectors': ['.event-item', '[data-event-id]', '.search-result']
+    }
+]
+
+# Rate limiting
+REQUEST_DELAY = 1.0
+
+# Disable Crawl4AI due to dependency conflicts - system works fine without it
+CRAWL4AI_AVAILABLE = False 

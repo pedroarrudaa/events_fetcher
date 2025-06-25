@@ -1,8 +1,5 @@
 """
-Hackathon GPT Extractor - Simplified using shared EventGPTExtractor.
-
-This module provides a thin wrapper around the unified EventGPTExtractor
-for hackathon-specific functionality.
+Hackathon GPT Extractor - 
 """
 
 import logging
