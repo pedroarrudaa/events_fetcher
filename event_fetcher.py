@@ -16,8 +16,7 @@ from shared_utils import (
 from database_utils import bulk_save_to_db, mark_urls_as_enriched_bulk
 from fetchers.sources.conference_sources import discover_conferences
 from fetchers.sources.hackathon_sources import discover_hackathons
-from fetchers.enrichers.conference_gpt_extractor import enrich_conference_data
-from fetchers.enrichers.hackathon_gpt_extractor import enrich_hackathon_data
+from fetchers.enrichers.unified_gpt_extractor import enrich_conference_data, enrich_hackathon_data
 from event_filters import filter_future_target_events
 
 
