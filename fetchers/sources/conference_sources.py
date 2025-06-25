@@ -1,6 +1,8 @@
 """
 Unified Conference Sources - Clean, consolidated event discovery.
 
+Refactored to use the unified BaseSourceDiscovery class, eliminating
+code duplication while preserving all conference-specific functionality.
 """
 
 import os
@@ -16,21 +18,32 @@ from shared_utils import (
     WebScraper, EventGPTExtractor, QueryGenerator, 
     performance_monitor, is_valid_event_url, logger
 )
+from .base_source_discovery import BaseSourceDiscovery
+from ..config_loader import get_config_loader
 
 
-class UnifiedConferenceSources:
+class UnifiedConferenceSources(BaseSourceDiscovery):
     """
     Unified conference discovery from all sources.
     
-    Combines Tavily search, Google search, specific site scraping,
-    and aggregator expansion into a single clean interface.
+    Refactored to inherit from BaseSourceDiscovery, eliminating duplicate
+    code while preserving conference-specific functionality like Tavily search,
+    aggregator expansion, and specialized site scraping.
     """
     
-    def __init__(self):
-        """Initialize unified conference sources."""
-        self.scraper = WebScraper()
-        self.enricher = EventGPTExtractor('conference')
-        self.query_generator = QueryGenerator()
+    def _init_event_config(self):
+        """Initialize conference-specific configuration from external files."""
+        self.config_loader = get_config_loader()
+        self.config = self.config_loader.get_config('conference')
+        
+        # Load from configuration files instead of hardcoded values
+        self.trusted_domains = self.config_loader.get_trusted_domains('conference')
+        self.target_locations = self.config_loader.get_target_locations('conference')
+        self.excluded_locations = self.config_loader.get_excluded_locations('conference')
+        self.conference_keywords = self.config_loader.get_event_keywords('conference')
+        self.conference_sites = self.config.get('conference_sites', [])
+        self.search_queries = self.config_loader.get_search_queries('conference')
+        self.discovery_settings = self.config_loader.get_discovery_settings('conference')
         
         # Tavily client setup
         try:
@@ -40,81 +53,50 @@ class UnifiedConferenceSources:
         except ImportError:
             self.tavily_client = None
             logger.log("warning", "Tavily not available - install with: pip install tavily-python")
+    
+    def get_event_keywords(self) -> List[str]:
+        """Get conference-specific keywords."""
+        return self.conference_keywords
+    
+    def get_sources_config(self) -> List[Dict[str, Any]]:
+        """Get source configurations - conferences use site scraping instead of API sources."""
+        # Convert conference sites to standard source format
+        sources = []
+        for site in self.conference_sites:
+            sources.append({
+                'name': site['name'],
+                'base_url': site['url'],
+                'search_urls': [site['url']],
+                'selectors': site['selectors'],
+                'max_pages': 1,
+                'reliability': 0.8,
+                'use_api': False
+            })
+        return sources
+    
+    def _is_relevant_event(self, url: str, text: str, source_config: Dict[str, Any]) -> bool:
+        """Check if content is relevant to conferences."""
+        # Use base URL pattern validation
+        if not self._is_valid_url_pattern(url, source_config):
+            return False
         
-        # Configuration
-        self.trusted_domains = {
-            'lu.ma': 0.95, 'eventbrite.com': 0.9, 'meetup.com': 0.8, 
-            'ieee.org': 0.95, 'acm.org': 0.95, 'oreilly.com': 0.9, 
-            'techcrunch.com': 0.85, 'aiml.events': 0.85, 'techmeme.com': 0.75,
-            'luma.com': 0.8, 'conference.com': 0.7, 'tech.events': 0.8
-        }
+        # Check for conference keywords
+        if not self._has_event_keywords(text):
+            return False
         
-        # Target locations - conferences must be in these areas (NO VIRTUAL/REMOTE)
-        self.target_locations = [
-            # San Francisco area
-            'san francisco', 'sf',
-            # New York area  
-            'new york', 'nyc', 'manhattan', 'brooklyn', 'queens', 'bronx',
-            'new york city', 'ny',
-        ]
+        # Additional conference-specific validation
+        if len(text) < 10:  # Too short
+            return False
         
-        # Excluded locations/terms - these will be filtered out
-        self.excluded_locations = [
-            'virtual', 'online', 'remote', 'worldwide', 'global', 'digital',
-            'webinar', 'livestream', 'streaming', 'zoom', 'teams'
-        ]
-        
-        self.conference_sites = [
-            {
-                'name': 'Eventbrite AI SF',
-                'url': 'https://www.eventbrite.com/d/ca--san-francisco/artificial-intelligence/',
-                'selectors': ['.event-card', '.eds-event-card', '[data-event-id]']
-            },
-            {
-                'name': 'Meetup SF AI',
-                'url': 'https://www.meetup.com/find/?keywords=artificial%20intelligence&location=San%20Francisco%2C%20CA',
-                'selectors': ['.event-item', '[data-event-id]', '.search-result']
-            },
-            {
-                'name': 'Luma AI SF',
-                'url': 'https://lu.ma/discover?dates=upcoming&location=San+Francisco%2C+CA&q=AI',
-                'selectors': ['.event-card', '[data-event]', '.event-item', 'article']
-            },
-            {
-                'name': 'Luma AI NYC',
-                'url': 'https://lu.ma/discover?dates=upcoming&location=New+York%2C+NY&q=AI',
-                'selectors': ['.event-card', '[data-event]', '.event-item', 'article']
-            },
-            {
-                'name': 'AI ML Events',
-                'url': 'https://aiml.events/',
-                'selectors': ['.event-card', '.event-item', '[data-event]', 'article']
-            },
-            {
-                'name': 'TechMeme Events',
-                'url': 'https://www.techmeme.com/events',
-                'selectors': ['div[class*="event"]', '.item', 'article']
-            }
-        ]
-        
-        self.conference_keywords = [
-            # Event types
-            'conference', 'summit', 'symposium', 'workshop', 'expo', 'meetup', 'demo day',
-            # GenAI specific terms (perfect for your calendar)
-            'generative ai', 'genai', 'llm', 'large language model', 'chatgpt', 'gpt',
-            'foundation models', 'transformer', 'prompt engineering', 'ai agent',
-            # Broader AI terms
-            'artificial intelligence', 'machine learning', 'deep learning', 'neural network',
-            'ai research', 'ai safety', 'ai ethics', 'ai startup', 'ai developer',
-            # Tech/startup ecosystem
-            'tech', 'technology', 'startup', 'innovation', 'developer', 'founder',
-            'venture capital', 'demo day', 'pitch', 'product launch'
-        ]
+        return True
     
     @performance_monitor
     def discover_all_conferences(self, max_results: int = 200) -> List[Dict[str, Any]]:
         """
         Discover conferences from all available sources with early stopping.
+        
+        Uses the base class for common functionality while adding conference-specific
+        features like Tavily search and aggregator expansion.
         
         Args:
             max_results: Maximum number of conferences to return (controls processing)
@@ -125,25 +107,25 @@ class UnifiedConferenceSources:
         logger.log("info", f"Starting efficient conference discovery (target: {max_results})")
         all_conferences = []
         
-        # 1. Quick site scraping first (usually fast)
+        # 1. Use base class for site scraping (eliminates duplicate scraping code)
         if len(all_conferences) < max_results:
-            site_results = self._scrape_conference_sites()
+            site_results = self.discover_all_events(max_results)
             all_conferences.extend(site_results)
             logger.log("info", f"Site scraping found {len(site_results)} conferences")
         
-        # 2. Efficient Tavily search with early stopping
+        # 2. Conference-specific: Efficient Tavily search with early stopping
         if len(all_conferences) < max_results and self.tavily_client:
             remaining_needed = max_results - len(all_conferences)
             tavily_results = self._search_with_tavily_limited(remaining_needed)
             all_conferences.extend(tavily_results)
             logger.log("info", f"Tavily search found {len(tavily_results)} conferences")
         
-        # 3. Expand aggregators only if needed
+        # 3. Conference-specific: Expand aggregators only if needed
         if len(all_conferences) < max_results:
             expanded_results = self._expand_aggregators(all_conferences)
             all_conferences = expanded_results
         
-        # 4. Deduplicate and rank
+        # 4. Use base class deduplication and ranking
         unique_conferences = self._deduplicate_and_rank(all_conferences)
         
         # 5. Apply final limit
@@ -205,46 +187,10 @@ class UnifiedConferenceSources:
         return conferences
     
     def _generate_efficient_queries(self) -> List[str]:
-        """Generate a smaller set of high-quality queries."""
-        # Start with the most effective queries based on our debug results
-        core_queries = [
-            # Generative AI focused searches (perfect for your calendar)
-            '"generative AI conference" San Francisco 2025',
-            '"LLM conference" San Francisco 2025',
-            '"ChatGPT conference" Bay Area 2025',
-            '"AI startup" conference San Francisco 2025',
-            '"foundation models" conference SF 2025',
-            
-            # Platform-specific searches for GenAI
-            'eventbrite.com "generative AI" San Francisco 2025',
-            'eventbrite.com "LLM" Bay Area 2025',
-            'eventbrite.com "AI developer" San Francisco 2025',
-            'meetup.com "generative AI" San Francisco',
-            'lu.ma "AI conference" San Francisco 2025',
-            'lu.ma "generative AI" New York 2025',
-            'lu.ma "LLM meetup" Bay Area 2025',
-            
-            # Company/brand specific (high-value for GenAI calendar)
-            'OpenAI DevDay 2025 San Francisco',
-            'Anthropic conference 2025',
-            'Google AI conference San Francisco 2025',
-            'Microsoft AI conference Bay Area 2025',
-            'Meta AI conference Silicon Valley 2025',
-            'NVIDIA AI conference 2025',
-            
-            # Developer/researcher focused
-            '"AI research conference" Stanford 2025',
-            '"AI developer conference" San Francisco 2025',
-            '"prompt engineering conference" Bay Area 2025',
-            '"AI safety conference" Silicon Valley 2025',
-            
-            # Startup ecosystem (relevant for GenAI SF community)
-            'AI startup demo day San Francisco 2025',
-            'YCombinator AI demo day 2025',
-            'TechCrunch AI Disrupt 2025'
-        ]
-        
-        return core_queries
+        """Generate efficient queries from configuration."""
+        # Load queries from configuration instead of hardcoded values
+        max_queries = self.discovery_settings.get('max_search_queries', 25)
+        return self.search_queries[:max_queries]
     
     def _is_target_location(self, conference: Dict[str, Any]) -> bool:
         """Check if conference is in target locations (SF/NY PHYSICAL ONLY)."""
@@ -426,25 +372,32 @@ class UnifiedConferenceSources:
         
         return conferences[:20]  # Limit expansion results
     
-    def _calculate_quality_score(self, url: str, content: str) -> float:
-        """Calculate quality score for a conference."""
+    def _calculate_quality_score(self, url: str, content: str, source_config: Dict[str, Any] = None) -> float:
+        """Calculate quality score for a conference with conference-specific scoring."""
         score = 0.5  # Base score
         
-        # Domain reputation
+        # Domain reputation (conference-specific trusted domains)
         for domain, domain_score in self.trusted_domains.items():
             if domain in url.lower():
                 score = max(score, domain_score)
                 break
         
-        # Content quality indicators
+        # Conference-specific content quality indicators
+        content_lower = content.lower()
+        
         if len(content) > 100:
             score += 0.1
         
-        if any(keyword in content.lower() for keyword in ['registration', 'speakers', 'agenda']):
+        # Conference-specific quality markers
+        if any(keyword in content_lower for keyword in ['registration', 'speakers', 'agenda']):
             score += 0.1
         
         if any(year in content for year in ['2024', '2025']):
             score += 0.1
+        
+        # Conference-specific bonus for AI/tech terms
+        if any(term in content_lower for term in ['ai', 'artificial intelligence', 'machine learning']):
+            score += 0.05
         
         return min(score, 1.0)
     

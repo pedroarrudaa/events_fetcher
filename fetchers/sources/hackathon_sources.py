@@ -1,6 +1,8 @@
 """
 Unified Hackathon Sources - Consolidated hackathon discovery.
 
+Refactored to use the unified BaseSourceDiscovery class, eliminating
+code duplication while preserving all hackathon-specific functionality.
 """
 
 import os
@@ -17,11 +19,16 @@ from shared_utils import (
     WebScraper, EventGPTExtractor, QueryGenerator, 
     performance_monitor, is_valid_event_url, logger
 )
+from .base_source_discovery import BaseSourceDiscovery
+from ..config_loader import get_config_loader
 
 
 def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
     """
-    Fetch open hackathons from Devpost public API with AI search filter and SF/NY/Online location filtering.
+    Fetch open hackathons from Devpost public API with location filtering.
+    
+    NOTE: This function uses configuration-driven filtering but loads config
+    locally to maintain standalone functionality for legacy compatibility.
     
     Args:
         pages: Number of pages to fetch (default: 1)
@@ -30,28 +37,41 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
         List of hackathon dictionaries with title, url, submission_deadline, location, and online
     """
     hackathons = []
-    base_url = "https://devpost.com/api/hackathons"
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://devpost.com/hackathons',
-        'X-Requested-With': 'XMLHttpRequest'
-    }
-    
-    # Target locations for filtering
-    target_locations = [
-        'san francisco', 'sf', 'bay area', 'silicon valley', 'california', 'ca',
-        'new york', 'ny', 'nyc', 'new york city', 'manhattan', 'brooklyn',
-        'online', 'virtual', 'remote', 'worldwide', 'global'
-    ]
-    
-    # Online indicators for hackathons that don't explicitly mark online=true
-    online_indicators = [
-        'online', 'virtual', 'remote', 'global', 'worldwide', 'digital',
-        'internet', 'from home', 'anywhere'
-    ]
+    # Load configuration (try to use global config, fall back to defaults)
+    try:
+        config_loader = get_config_loader()
+        devpost_config = config_loader.get_devpost_api_config()
+        target_locations = config_loader.get_target_locations('hackathon')
+        online_indicators = config_loader.get_online_indicators('hackathon')
+        
+        base_url = devpost_config.get('base_url', "https://devpost.com/api/hackathons")
+        headers = devpost_config.get('headers', {})
+        default_params = devpost_config.get('default_params', {})
+        rate_limit_delay = devpost_config.get('rate_limit_delay', 1.0)
+        rate_limit_429_delay = devpost_config.get('rate_limit_429_delay', 5.0)
+    except:
+        # Fallback to hardcoded values if config loading fails
+        base_url = "https://devpost.com/api/hackathons"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://devpost.com/hackathons',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        default_params = {'per_page': 20, 'status': 'open'}
+        target_locations = [
+            'san francisco', 'sf', 'bay area', 'silicon valley', 'california', 'ca',
+            'new york', 'ny', 'nyc', 'new york city', 'manhattan', 'brooklyn',
+            'online', 'virtual', 'remote', 'worldwide', 'global'
+        ]
+        online_indicators = [
+            'online', 'virtual', 'remote', 'global', 'worldwide', 'digital',
+            'internet', 'from home', 'anywhere'
+        ]
+        rate_limit_delay = 1.0
+        rate_limit_429_delay = 5.0
     
     # First try to get hackathons with general search
     for page in range(1, pages + 1):
@@ -59,8 +79,7 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
             params = {
                 'search': '',  # Get all hackathons, not just AI
                 'page': page,
-                'per_page': 20,  # Standard page size
-                'status[]': 'open'  # Only open hackathons
+                **default_params  # Use configured parameters
             }
             
             logger.log("info", f"Fetching Devpost hackathons page {page}")
@@ -131,13 +150,13 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
                 
                 logger.log("info", f"Fetched {len(hackathons_data)} hackathons from page {page}")
                 
-                # Rate limiting between pages
+                # Rate limiting between pages (use configured delay)
                 if page < pages:
-                    time.sleep(1)
+                    time.sleep(rate_limit_delay)
                     
             elif response.status_code == 429:
                 logger.log("warning", "Rate limited by Devpost API")
-                time.sleep(5)  # Wait longer for rate limits
+                time.sleep(rate_limit_429_delay)  # Use configured delay for rate limits
                 break
             else:
                 logger.log("warning", f"Devpost API returned status {response.status_code}")
@@ -248,67 +267,56 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
     return hackathons
 
 
-class UnifiedHackathonSources:
+class UnifiedHackathonSources(BaseSourceDiscovery):
     """
     Unified hackathon discovery from all sources.
     
-    Combines Devpost API, Eventbrite, and MLH into a single clean interface.
-    Removed problematic sources: HackerEarth and Hackathon.com
+    Refactored to inherit from BaseSourceDiscovery, eliminating duplicate
+    code while preserving hackathon-specific functionality like Devpost API
+    integration and location filtering for remote events.
     """
     
-    def __init__(self):
-        """Initialize unified hackathon sources."""
-        self.scraper = WebScraper()
-        self.enricher = EventGPTExtractor('hackathon')
-        self.query_generator = QueryGenerator()
+    def _init_event_config(self):
+        """Initialize hackathon-specific configuration from external files."""
+        self.config_loader = get_config_loader()
+        self.config = self.config_loader.get_config('hackathon')
         
-        # Source configurations - Removed HackerEarth and Hackathon.com
-        self.sources = [
-            {
-                'name': 'Devpost',
-                'base_url': 'https://devpost.com',
-                'use_api': True,
-                'search_urls': ['https://devpost.com/hackathons'],
-                'url_patterns': ['/hackathons/'],
-                'keywords': ['hackathon', 'hack', 'challenge', 'contest'],
-                'max_pages': 5,
-                'reliability': 0.95  # Higher reliability with API
-            },
-            {
-                'name': 'MLH',
-                'base_url': 'https://mlh.io',
-                'use_api': False,
-                'search_urls': ['https://mlh.io/seasons/2025/events'],
-                'url_patterns': ['/events/', '/event/'],
-                'keywords': ['hackathon', 'hack', 'mlh'],
-                'max_pages': 1,
-                'reliability': 0.95
-            },
-            {
-                'name': 'Eventbrite',
-                'base_url': 'https://www.eventbrite.com',
-                'use_api': False,
-                'search_urls': [
-                    'https://www.eventbrite.com/d/online/hackathon',
-                    'https://www.eventbrite.com/d/online/hack',
-                    'https://www.eventbrite.com/d/online/coding-challenge'
-                ],
-                'url_patterns': ['/e/'],
-                'keywords': ['hackathon', 'hack', 'coding', 'programming'],
-                'max_pages': 3,
-                'reliability': 0.7
-            }
-        ]
+        # Load from configuration files instead of hardcoded values
+        self.sources = self.config_loader.get_sources_config('hackathon')
+        self.hackathon_keywords = self.config_loader.get_event_keywords('hackathon')
+        self.target_locations = self.config_loader.get_target_locations('hackathon')
+        self.online_indicators = self.config_loader.get_online_indicators('hackathon')
+        self.discovery_settings = self.config_loader.get_discovery_settings('hackathon')
+        self.devpost_api_config = self.config_loader.get_devpost_api_config()
+        self.quality_scoring_config = self.config_loader.get_quality_scoring_config('hackathon')
+    
+    def get_event_keywords(self) -> List[str]:
+        """Get hackathon-specific keywords."""
+        return self.hackathon_keywords
+    
+    def get_sources_config(self) -> List[Dict[str, Any]]:
+        """Get source configurations for hackathons."""
+        return self.sources
+    
+    def _is_relevant_event(self, url: str, text: str, source_config: Dict[str, Any]) -> bool:
+        """Check if content is relevant to hackathons."""
+        # Use base URL pattern validation
+        if not self._is_valid_url_pattern(url, source_config):
+            return False
         
-        self.hackathon_keywords = [
-            'hackathon', 'hack', 'coding challenge', 'programming contest',
-            'developer challenge', 'coding competition', 'tech challenge'
-        ]
+        # Check for hackathon keywords
+        if not self._has_event_keywords(text):
+            return False
+        
+        return True
     
     @performance_monitor
     def discover_all_hackathons(self, max_results: int = 60) -> List[Dict[str, Any]]:
         """
         Discover hackathons from all available sources.
+        
+        Uses the base class discover_all_events method which handles the common
+        source iteration, API vs scraping logic, and deduplication.
         
         Args:
             max_results: Maximum number of hackathons to return
@@ -316,64 +324,30 @@ class UnifiedHackathonSources:
         Returns:
             List of hackathon dictionaries
         """
-        logger.log("info", "Starting unified hackathon discovery")
-        all_hackathons = []
-        
-        for source_config in self.sources:
-            try:
-                if source_config.get('use_api', False):
-                    source_hackathons = self._scrape_api_source(source_config)
-                else:
-                    source_hackathons = self._scrape_source(source_config)
-                    
-                all_hackathons.extend(source_hackathons)
-                logger.log("info", f"{source_config['name']} found {len(source_hackathons)} hackathons")
-                
-                # Rate limiting between sources
-                time.sleep(2)
-                
-            except Exception as e:
-                logger.log("error", f"Failed to scrape {source_config['name']}", error=str(e))
-        
-        # Deduplicate and rank
-        unique_hackathons = self._deduplicate_and_rank(all_hackathons)
-        
-        # Limit results
-        final_results = unique_hackathons[:max_results]
-        
-        logger.log("info", f"Hackathon discovery completed", 
-                  total_found=len(all_hackathons), 
-                  unique=len(unique_hackathons), 
-                  final=len(final_results))
-        
-        return final_results
+        # Use base class method which handles all the common logic
+        return self.discover_all_events(max_results)
     
-    def _scrape_api_source(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Scrape a source using its API endpoint."""
+    def _handle_api_source(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Handle hackathon-specific API sources, particularly Devpost."""
         hackathons = []
         source_name = source_config['name']
         
-        logger.log("info", f"Using API for {source_name}")
-        
-        try:
-            if source_name == 'Devpost':
-                hackathons = self._fetch_devpost_api_hackathons(source_config)
-            
-        except Exception as e:
-            logger.log("error", f"API error for {source_name}", error=str(e))
-            # Fallback to regular scraping if API fails
-            logger.log("info", f"Falling back to regular scraping for {source_name}")
+        if source_name == 'Devpost':
+            hackathons = self._fetch_devpost_api_hackathons(source_config)
+        else:
+            # For non-API sources, use the base class scraping
             hackathons = self._scrape_source(source_config)
         
         return hackathons
     
     def _fetch_devpost_api_hackathons(self, source_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Fetch hackathons from Devpost API."""
+        """Fetch hackathons from Devpost API using configuration."""
         hackathons = []
         
         try:
-            # Use the official Devpost API with more pages
-            hackathons = fetch_devpost_hackathons(pages=10)  # Fetch up to 10 pages for more results
+            # Use the configuration-driven Devpost API fetcher
+            max_pages = self.devpost_api_config.get('max_pages', 10)
+            hackathons = fetch_devpost_hackathons(pages=max_pages)
                 
         except Exception as e:
             logger.log("error", f"Devpost API error: {str(e)}")
@@ -509,23 +483,30 @@ class UnifiedHackathonSources:
             return ''
     
     def _calculate_quality_score(self, url: str, text: str, source_config: Dict[str, Any]) -> float:
-        """Calculate quality score for a hackathon."""
-        score = source_config['reliability']  # Base score from source reliability
+        """Calculate quality score for a hackathon using configuration."""
+        # Get scoring configuration
+        scoring = self.quality_scoring_config
+        base_score_key = scoring.get('base_score_key', 'reliability')
+        score = source_config.get(base_score_key, 0.5)
         
-        # Content quality indicators
+        # Content quality indicators from configuration
         text_lower = text.lower()
         
+        # Year bonus
         if any(word in text_lower for word in ['2024', '2025']):
-            score += 0.1
+            score += scoring.get('year_bonus', 0.1)
         
+        # Prize/award bonus
         if any(word in text_lower for word in ['prize', 'award', 'winner']):
-            score += 0.05
+            score += scoring.get('prize_bonus', 0.05)
         
+        # Online accessibility bonus
         if any(word in text_lower for word in ['virtual', 'online', 'remote']):
-            score += 0.05
+            score += scoring.get('online_bonus', 0.05)
         
-        if len(text) > 30:  # Detailed name/description
-            score += 0.05
+        # Detail length bonus
+        if len(text) > 30:
+            score += scoring.get('detail_bonus', 0.05)
         
         return min(score, 1.0)
     
