@@ -1,0 +1,144 @@
+# Hackathon Sources Configuration
+# This file contains all configuration settings for hackathon discovery
+
+# Target locations for hackathons (includes remote/online)
+target_locations:
+  # San Francisco area
+  - "san francisco"
+  - "sf"
+  - "bay area"
+  - "silicon valley"
+  - "california"
+  - "ca"
+  # New York area
+  - "new york"
+  - "ny"
+  - "nyc"
+  - "new york city"
+  - "manhattan"
+  - "brooklyn"
+  # Remote/online options (hackathons allow these)
+  - "online"
+  - "virtual"
+  - "remote"
+  - "worldwide"
+  - "global"
+
+# Online indicators for hackathons
+online_indicators:
+  - "online"
+  - "virtual"
+  - "remote"
+  - "global"
+  - "worldwide"
+  - "digital"
+  - "internet"
+  - "from home"
+  - "anywhere"
+
+# Hackathon-specific keywords
+hackathon_keywords:
+  - "hackathon"
+  - "hack"
+  - "coding challenge"
+  - "programming contest"
+  - "developer challenge"
+  - "coding competition"
+  - "tech challenge"
+
+# Source configurations (removed problematic sources)
+sources:
+  - name: "Devpost"
+    base_url: "https://devpost.com"
+    use_api: true
+    search_urls:
+      - "https://devpost.com/hackathons"
+    url_patterns:
+      - "/hackathons/"
+    keywords:
+      - "hackathon"
+      - "hack"
+      - "challenge"
+      - "contest"
+    max_pages: 5
+    reliability: 0.95
+    
+  - name: "MLH"
+    base_url: "https://mlh.io"
+    use_api: false
+    search_urls:
+      - "https://mlh.io/seasons/2025/events"
+    url_patterns:
+      - "/events/"
+      - "/event/"
+    keywords:
+      - "hackathon"
+      - "hack"
+      - "mlh"
+    max_pages: 1
+    reliability: 0.95
+    
+  - name: "Eventbrite"
+    base_url: "https://www.eventbrite.com"
+    use_api: false
+    search_urls:
+      - "https://www.eventbrite.com/d/online/hackathon"
+      - "https://www.eventbrite.com/d/online/hack"
+      - "https://www.eventbrite.com/d/online/coding-challenge"
+    url_patterns:
+      - "/e/"
+    keywords:
+      - "hackathon"
+      - "hack"
+      - "coding"
+      - "programming"
+    max_pages: 3
+    reliability: 0.7
+
+# Devpost API specific searches
+devpost_specific_searches:
+  - search: "hackathon"
+    location: "San Francisco"
+  - search: "hackathon"
+    location: "New York"
+  - search: "ai hackathon"
+    location: ""
+  - search: "tech hackathon"
+    location: ""
+  - search: "online hackathon"
+    location: ""
+  - search: "virtual hackathon"
+    location: ""
+  - search: "startup hackathon"
+    location: ""
+
+# Devpost API configuration
+devpost_api:
+  base_url: "https://devpost.com/api/hackathons"
+  headers:
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    Accept: "application/json, text/plain, */*"
+    Accept-Language: "en-US,en;q=0.9"
+    Referer: "https://devpost.com/hackathons"
+    X-Requested-With: "XMLHttpRequest"
+  default_params:
+    per_page: 20
+    status: "open"
+  max_pages: 10
+  rate_limit_delay: 1.0
+  rate_limit_429_delay: 5.0
+
+# Quality scoring adjustments for hackathons
+quality_scoring:
+  year_bonus: 0.1  # Bonus for current/future year
+  prize_bonus: 0.05  # Bonus for mentioning prizes/awards
+  online_bonus: 0.05  # Bonus for online accessibility
+  detail_bonus: 0.05  # Bonus for detailed descriptions
+  base_score_key: "reliability"  # Use source reliability as base
+
+# Discovery settings
+discovery_settings:
+  max_results: 60
+  source_rate_limit: 2.0
+  page_rate_limit: 1.0
+  page_result_limit: 20 
