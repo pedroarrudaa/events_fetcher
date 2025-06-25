@@ -53,17 +53,17 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
         'internet', 'from home', 'anywhere'
     ]
     
-    # First try to get hackathons with AI search
+    # First try to get hackathons with general search
     for page in range(1, pages + 1):
         try:
             params = {
-                'search': 'ai',  # Filter for AI-related hackathons
+                'search': '',  # Get all hackathons, not just AI
                 'page': page,
                 'per_page': 20,  # Standard page size
                 'status[]': 'open'  # Only open hackathons
             }
             
-            logger.log("info", f"Fetching Devpost AI hackathons page {page}")
+            logger.log("info", f"Fetching Devpost hackathons page {page}")
             
             response = requests.get(base_url, headers=headers, params=params, timeout=15)
             
@@ -150,11 +150,15 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
             logger.log("error", f"Unexpected error on page {page}: {str(e)}")
             break
     
-    # Also search specifically for SF and NY hackathons
+    # Also search specifically for different types of hackathons
     specific_searches = [
         {'search': 'hackathon', 'location': 'San Francisco'},
         {'search': 'hackathon', 'location': 'New York'},
-        {'search': 'ai hackathon online', 'location': ''},
+        {'search': 'ai hackathon', 'location': ''},
+        {'search': 'tech hackathon', 'location': ''},
+        {'search': 'online hackathon', 'location': ''},
+        {'search': 'virtual hackathon', 'location': ''},
+        {'search': 'startup hackathon', 'location': ''},
     ]
     
     for search_params in specific_searches:
@@ -162,7 +166,7 @@ def fetch_devpost_hackathons(pages: int = 1) -> List[Dict[str, Any]]:
             params = {
                 'search': search_params['search'],
                 'page': 1,
-                'per_page': 10,
+                'per_page': 20,  # Increased from 10 to 20
                 'status[]': 'open'
             }
             
@@ -368,8 +372,8 @@ class UnifiedHackathonSources:
         hackathons = []
         
         try:
-            # Use the official Devpost API
-            hackathons = fetch_devpost_hackathons(pages=3)  # Fetch up to 3 pages
+            # Use the official Devpost API with more pages
+            hackathons = fetch_devpost_hackathons(pages=10)  # Fetch up to 10 pages for more results
                 
         except Exception as e:
             logger.log("error", f"Devpost API error: {str(e)}")

@@ -199,7 +199,7 @@ def run_event_fetcher(event_type: EventType, limit: int = None):
         print(f"After deduplication: {len(unique_events)} unique {event_type}s")
         
         # Filter for future events only (remove past events)
-        future_events = filter_future_target_events(unique_events, event_type)
+        future_events = filter_future_target_events(unique_events)
         print(f"After date filtering: {len(future_events)} future {event_type}s (removed {len(unique_events) - len(future_events)} past events)")
         
         # Apply final limit if needed (should rarely be needed now)

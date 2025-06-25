@@ -430,14 +430,22 @@ class ContentEnricher:
                 return Event(url=url, name='OpenAI unavailable')
             
             prompt = f"""Extract {self.event_type} details from the webpage content and return ONLY valid JSON.
+
+IMPORTANT: Only extract events that are clearly related to technology, AI, software, data science, startups, or tech innovation. 
+REJECT events about: real estate, finance (unless fintech), healthcare (unless healthtech), education (unless edtech), 
+legal services, accounting, traditional business, fitness, entertainment, or other non-tech topics.
+
 Focus on extracting accurate dates and locations. For dates, use YYYY-MM-DD format.
-For locations, be specific (city, state/country). Mark as remote only if explicitly virtual/online.
+For locations, be specific (city, state/country). Only accept events in San Francisco/Bay Area or New York City.
+Mark as remote only if explicitly virtual/online.
 
 Return this exact JSON structure:
 {{"name": "exact event name", "start_date": "YYYY-MM-DD or null", "end_date": "YYYY-MM-DD or null", 
 "location": "specific city, state/country or null", "city": "city name or null", 
 "remote": false, "description": "brief description", "speakers": [], 
 "ticket_price": "price or null", "is_paid": false, "themes": []}}
+
+If the event is not tech-related or not in SF/NYC, return: {{"name": "Not a tech event", "start_date": null, "end_date": null, "location": null, "city": null, "remote": false, "description": "Event not relevant to tech/AI focus", "speakers": [], "ticket_price": null, "is_paid": false, "themes": []}}
 
 If information is missing, use null not "TBD". Extract what you can find."""
             
