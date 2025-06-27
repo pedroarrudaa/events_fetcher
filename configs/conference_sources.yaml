@@ -1,0 +1,181 @@
+# Conference Sources Configuration
+# This file contains all configuration settings for conference discovery
+
+# Target locations - conferences must be in these areas (NO VIRTUAL/REMOTE)
+target_locations:
+  - "san francisco"
+  - "sf"
+  - "new york"
+  - "nyc"
+  - "manhattan"
+  - "brooklyn" 
+  - "queens"
+  - "bronx"
+  - "new york city"
+  - "ny"
+
+# Excluded locations/terms - these will be filtered out
+excluded_locations:
+  - "virtual"
+  - "online"
+  - "remote"
+  - "worldwide"
+  - "global"
+  - "digital"
+  - "webinar"
+  - "livestream"
+  - "streaming"
+  - "zoom"
+  - "teams"
+
+# Conference-specific keywords for relevance filtering
+conference_keywords:
+  # Event types
+  - "conference"
+  - "summit"
+  - "symposium"
+  - "workshop"
+  - "expo"
+  - "meetup"
+  - "demo day"
+  # GenAI specific terms
+  - "generative ai"
+  - "genai"
+  - "llm"
+  - "large language model"
+  - "chatgpt"
+  - "gpt"
+  - "foundation models"
+  - "transformer"
+  - "prompt engineering"
+  - "ai agent"
+  # Broader AI terms
+  - "artificial intelligence"
+  - "machine learning"
+  - "deep learning"
+  - "neural network"
+  - "ai research"
+  - "ai safety"
+  - "ai ethics"
+  - "ai startup"
+  - "ai developer"
+  # Tech/startup ecosystem
+  - "tech"
+  - "technology"
+  - "startup"
+  - "innovation"
+  - "developer"
+  - "founder"
+  - "venture capital"
+  - "demo day"
+  - "pitch"
+  - "product launch"
+
+# Trusted domains with their reliability scores
+trusted_domains:
+  "lu.ma": 0.95
+  "eventbrite.com": 0.9
+  "meetup.com": 0.8
+  "ieee.org": 0.95
+  "acm.org": 0.95
+  "oreilly.com": 0.9
+  "techcrunch.com": 0.85
+  "aiml.events": 0.85
+  "techmeme.com": 0.75
+  "luma.com": 0.8
+  "conference.com": 0.7
+  "tech.events": 0.8
+
+# Conference site configurations for direct scraping
+conference_sites:
+  - name: "Eventbrite AI SF"
+    url: "https://www.eventbrite.com/d/ca--san-francisco/artificial-intelligence/"
+    selectors: 
+      - ".event-card"
+      - ".eds-event-card"
+      - "[data-event-id]"
+    
+  - name: "Meetup SF AI"
+    url: "https://www.meetup.com/find/?keywords=artificial%20intelligence&location=San%20Francisco%2C%20CA"
+    selectors:
+      - ".event-item"
+      - "[data-event-id]"
+      - ".search-result"
+    
+  - name: "Luma AI SF"
+    url: "https://lu.ma/discover?dates=upcoming&location=San+Francisco%2C+CA&q=AI"
+    selectors:
+      - ".event-card"
+      - "[data-event]"
+      - ".event-item"
+      - "article"
+    
+  - name: "Luma AI NYC"
+    url: "https://lu.ma/discover?dates=upcoming&location=New+York%2C+NY&q=AI"
+    selectors:
+      - ".event-card"
+      - "[data-event]"
+      - ".event-item"
+      - "article"
+    
+  - name: "AI ML Events"
+    url: "https://aiml.events/"
+    selectors:
+      - ".event-card"
+      - ".event-item"
+      - "[data-event]"
+      - "article"
+    
+  - name: "TechMeme Events"
+    url: "https://www.techmeme.com/events"
+    selectors:
+      - "div[class*=\"event\"]"
+      - ".item"
+      - "article"
+
+# Search query templates for external search APIs
+search_queries:
+  # Generative AI focused searches
+  - '"generative AI conference" San Francisco 2025'
+  - '"LLM conference" San Francisco 2025'
+  - '"ChatGPT conference" Bay Area 2025'
+  - '"AI startup" conference San Francisco 2025'
+  - '"foundation models" conference SF 2025'
+  
+  # Platform-specific searches for GenAI
+  - 'eventbrite.com "generative AI" San Francisco 2025'
+  - 'eventbrite.com "LLM" Bay Area 2025'
+  - 'eventbrite.com "AI developer" San Francisco 2025'
+  - 'meetup.com "generative AI" San Francisco'
+  - 'lu.ma "AI conference" San Francisco 2025'
+  - 'lu.ma "generative AI" New York 2025'
+  - 'lu.ma "LLM meetup" Bay Area 2025'
+  
+  # Company/brand specific
+  - 'OpenAI DevDay 2025 San Francisco'
+  - 'Anthropic conference 2025'
+  - 'Google AI conference San Francisco 2025'
+  - 'Microsoft AI conference Bay Area 2025'
+  - 'Meta AI conference Silicon Valley 2025'
+  - 'NVIDIA AI conference 2025'
+  
+  # Developer/researcher focused
+  - '"AI research conference" Stanford 2025'
+  - '"AI developer conference" San Francisco 2025'
+  - '"prompt engineering conference" Bay Area 2025'
+  - '"AI safety conference" Silicon Valley 2025'
+  
+  # Startup ecosystem
+  - 'AI startup demo day San Francisco 2025'
+  - 'YCombinator AI demo day 2025'
+  - 'TechCrunch AI Disrupt 2025'
+
+# Default discovery settings
+discovery_settings:
+  max_results: 200
+  max_search_queries: 25
+  search_results_per_query: 6
+  tavily_search_depth: "basic"
+  rate_limit_delay: 0.4
+  source_rate_limit: 1.0
+  aggregator_expansion_limit: 20 
