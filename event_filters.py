@@ -1,270 +1,304 @@
 """
-Streamlined event filtering utilities for conferences and hackathons.
+Event Filters - Filtering logic for events.
+
+This module contains all the filtering logic for events, including
+date filtering, location filtering, and quality filtering.
 """
-import re
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple, Set, Optional
-from dataclasses import dataclass, field
-from functools import lru_cache
-from shared_utils import DateParser
 
-@dataclass
-class FilterConfig:
-    """Configuration for event filtering."""
-    target_locations: List[str] = field(default_factory=lambda: [
-        'san francisco', 'sf', 'bay area', 'nyc', 'new york', 'manhattan',
-        'remote'
-    ])
+from typing import List, Dict, Any, Optional
+from datetime import datetime, date
 
-    invalid_patterns: List[str] = field(default_factory=lambda: [
-        r'^test\s+event', r'^mock\s+', r'^placeholder', r'^example\s+', r'^demo\s+',
-        r'^online$', r'^virtual$', r'^remote$', r'^hackathon$', r'^event$',
-        r'^.{1,3}$', r'^[\s\-_]*$', r'^https?://[^/]+/?$', r'/test', r'/demo'
-    ])
-    
-    non_hackathon_keywords: List[str] = field(default_factory=lambda: [
-        'summit', 'conference', 'workshop', 'seminar', 'expo', 'meetup',
-        'symposium', 'forum', 'congress', 'webinar', 'masterclass', 'course'
-    ])
+from shared_utils import DateParser, logger
 
-class EventFilter:
-    """Enhanced event filtering with tech relevance and location standardization."""
+
+def filter_future_target_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter events to only include future events that match target criteria.
     
-    # Non-tech keywords that should exclude events (unless combined with tech terms)
-    NON_TECH_KEYWORDS = {
-        'escrow', 'real estate', 'property', 'mortgage', 'loan', 'banking', 'insurance',
-        'accounting', 'tax', 'legal', 'law', 'medical', 'healthcare', 'pharmacy',
-        'restaurant', 'food service', 'retail', 'fashion', 'beauty', 'cosmetics',
-        'construction', 'plumbing', 'electrical', 'hvac', 'automotive', 'mechanic',
-        'fitness', 'yoga', 'wellness', 'spa', 'travel', 'tourism', 'hotel',
-        'education', 'teaching', 'k-12', 'elementary', 'middle school', 'high school',
-        'nonprofit', 'charity', 'fundraising', 'volunteer', 'community service',
-        'sports', 'recreation', 'entertainment', 'music', 'art', 'photography',
-        'training course', 'certification course', 'professional training',
-        'essentials training', 'foundation training', 'learning course', 'exin bcs',
-        'bcs training', 'certification program', 'training program'
-    }
+    Args:
+        events: List of event dictionaries
+        
+    Returns:
+        List of filtered events
+    """
+    filtered_events = []
     
-    # Tech keywords that should preserve events even if non-tech keywords present
-    TECH_KEYWORDS = {
-        'ai', 'artificial intelligence', 'machine learning', 'ml', 'deep learning',
-        'data science', 'analytics', 'big data', 'blockchain', 'cryptocurrency',
-        'fintech', 'regtech', 'insurtech', 'proptech', 'edtech', 'healthtech',
-        'software', 'programming', 'coding', 'development', 'api', 'cloud',
-        'devops', 'cybersecurity', 'iot', 'internet of things', 'robotics',
-        'automation', 'digital', 'tech', 'technology', 'startup', 'venture',
-        'saas', 'platform', 'algorithm', 'neural network', 'nlp', 'computer vision'
-    }
+    for event in events:
+        # Check if event is in the future
+        if not is_future_event(event):
+            continue
+        
+        # Check if event matches target location criteria
+        if not is_target_location(event):
+            continue
+        
+        # Check minimum quality
+        if not meets_quality_threshold(event):
+            continue
+        
+        filtered_events.append(event)
     
-    # Valid target locations
-    TARGET_LOCATIONS = {'San Francisco', 'New York'}
+    logger.log("info", f"Filtered {len(events)} events to {len(filtered_events)} future target events")
+    return filtered_events
+
+
+def is_future_event(event: Dict[str, Any]) -> bool:
+    """
+    Check if an event is in the future.
     
-    # Location mapping for standardization
-    LOCATION_MAPPINGS = {
-        # San Francisco variations
-        'san francisco': 'San Francisco',
-        'sf': 'San Francisco', 
-        'san francisco, ca': 'San Francisco',
-        'san francisco, california': 'San Francisco',
-        'san francisco bay area': 'San Francisco',
-        'silicon valley': 'San Francisco',
-        'silicon valley, california': 'San Francisco',
-        'palo alto': 'San Francisco',
-        'mountain view': 'San Francisco',
-        'sunnyvale': 'San Francisco',
-        'cupertino': 'San Francisco',
-        'redwood city': 'San Francisco',
-        'san jose': 'San Francisco',
+    Args:
+        event: Event dictionary
         
-        # New York variations  
-        'new york': 'New York',
-        'ny': 'New York',
-        'nyc': 'New York',
-        'new york city': 'New York',
-        'new york, ny': 'New York',
-        'manhattan': 'New York',
-        'brooklyn': 'New York',
-        'queens': 'New York'
-    }
+    Returns:
+        True if event is in the future, False otherwise
+    """
+    start_date_str = event.get('start_date')
     
-    def __init__(self, config: FilterConfig = None):
-        self.config = config or FilterConfig()
-        self.seen_urls: Set[str] = set()
-        
-        # Compile patterns once for performance
-        self._invalid_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.config.invalid_patterns]
-        self._location_pattern = '|'.join(re.escape(loc) for loc in self.config.target_locations)
-        
-        self.date_parser = DateParser()
-    
-    def filter_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Apply all filters: future dates, target locations, tech relevance."""
-        filtered_events = []
-        
-        for event in events:
-            # Skip if not future date
-            if not self._is_future_event(event.get('start_date', '')):
-                continue
-            
-            # Skip if not target location
-            if not self.is_target_location(event.get('location', '')):
-                continue
-            
-            # Skip if not tech relevant
-            if not self.is_tech_relevant(
-                event.get('name', ''), 
-                event.get('description', '')
-            ):
-                continue
-            
-            # Standardize location for consistency
-            standardized_location = self.standardize_location(event.get('location', ''))
-            if standardized_location:
-                event['location'] = standardized_location
-            
-            filtered_events.append(event)
-        
-        return filtered_events
-    
-    def _is_future_event(self, event_date: str) -> bool:
-        """Check if event date is in the future."""
-        return self.date_parser.is_future_date(event_date)
-    
-    def is_tech_relevant(self, event_name: str, description: str = "") -> bool:
-        """Check if event is tech-relevant using keyword analysis."""
-        text = f"{event_name} {description}".lower()
-        
-        # Check for tech keywords
-        has_tech_keywords = any(keyword in text for keyword in self.TECH_KEYWORDS)
-        
-        # Check for non-tech keywords
-        has_non_tech_keywords = any(keyword in text for keyword in self.NON_TECH_KEYWORDS)
-        
-        # Allow if has tech keywords, or no non-tech keywords found
-        return has_tech_keywords or not has_non_tech_keywords
-    
-    def standardize_location(self, location: str) -> Optional[str]:
-        """Standardize location to San Francisco or New York, return None if not target location."""
-        if not location or location.lower() in ['tbd', 'none', 'null']:
-            return None
-            
-        location_lower = location.lower().strip()
-        
-        # Direct mapping
-        if location_lower in self.LOCATION_MAPPINGS:
-            return self.LOCATION_MAPPINGS[location_lower]
-        
-        # Fuzzy matching for variations
-        for pattern, standard in self.LOCATION_MAPPINGS.items():
-            if pattern in location_lower:
-                return standard
-        
-        return None  # Not a target location
-    
-    def is_target_location(self, location: str) -> bool:
-        """Check if location is in target cities (SF or NY)."""
-        standardized = self.standardize_location(location)
-        return standardized in self.TARGET_LOCATIONS
-    
-    def reset_deduplication(self):
-        """Reset URL deduplication tracking."""
-        self.seen_urls.clear()
-    
-    def _has_meaningful_name(self, name: str) -> bool:
-        """Check if name is meaningful and not generic."""
-        if not name or len(name.strip()) < 4:
-            return False
-        
-        name_lower = name.lower().strip()
-        
-        # Check against invalid patterns
-        if any(pattern.match(name_lower) for pattern in self._invalid_patterns):
-            return False
-        
-        # Must have meaningful words beyond common ones
-        meaningful_words = [w for w in re.findall(r'\b[a-zA-Z]{3,}\b', name)
-                          if w.lower() not in {'hackathon', 'hack', 'the', 'and', 'for', 'in', 'on', 'at', 'of'}]
-        
-        return len(meaningful_words) >= 1
-    
-    def _has_valid_url(self, url: str) -> bool:
-        """Check if URL is valid and specific."""
-        if not url or not url.strip():
-            return False
-        
-        url_lower = url.lower()
-        
-        # Check against invalid URL patterns
-        return not any(pattern.search(url_lower) for pattern in self._invalid_patterns if r'http' in pattern.pattern)
-    
-    def _has_sufficient_data(self, event: Dict[str, Any]) -> bool:
-        """Check if event has sufficient data quality."""
-        required_fields = ['name', 'url']
-        if not all(event.get(field) for field in required_fields):
-            return False
-        
-        # At least one of: date info, location, or description
-        optional_data = [
-            event.get('start_date'), event.get('date'), event.get('location'),
-            event.get('city'), event.get('description')
-        ]
-        
-        return any(data and str(data).strip() not in {'TBD', 'N/A', ''} for data in optional_data)
-    
-    def _is_unique(self, url: str) -> bool:
-        """Check URL uniqueness."""
-        if not url:
-            return False
-        
-        normalized_url = url.lower().strip().rstrip('/')
-        if normalized_url in self.seen_urls:
-            return False
-        
-        self.seen_urls.add(normalized_url)
+    # If no start date, assume it's future
+    if not start_date_str or start_date_str == 'TBD':
         return True
     
-    def _is_actually_hackathon(self, event: Dict[str, Any]) -> bool:
-        """Check if event is actually a hackathon."""
-        content = ' '.join(filter(None, [
-            str(event.get('name', '')),
-            str(event.get('description', ''))
-        ])).lower()
+    return DateParser.is_future_date(start_date_str)
+
+
+def is_target_location(event: Dict[str, Any]) -> bool:
+    """
+    Check if event is in a target location.
+    
+    For conferences: Must be in SF/NYC or remote
+    For hackathons: Can be anywhere including online
+    
+    Args:
+        event: Event dictionary
         
-        # Must not be primarily a non-hackathon event
-        non_hackathon_count = sum(1 for keyword in self.config.non_hackathon_keywords 
-                                 if keyword in content)
+    Returns:
+        True if event is in target location
+    """
+    event_type = event.get('event_type', event.get('source', 'unknown'))
+    location = (event.get('location') or '').lower()
+    is_remote = event.get('remote', False)
+    
+    # Hackathons can be anywhere
+    if 'hackathon' in event_type:
+        return True
+    
+    # Conferences must be in target locations
+    target_locations = [
+        'san francisco', 'sf', 'bay area', 'silicon valley',
+        'palo alto', 'mountain view', 'santa clara', 'san jose',
+        'new york', 'nyc', 'manhattan', 'brooklyn', 'new york city'
+    ]
+    
+    # Check if remote/online
+    if is_remote or any(term in location for term in ['online', 'virtual', 'remote']):
+        return True
+    
+    # Check if in target location
+    return any(target in location for target in target_locations)
+
+
+def meets_quality_threshold(event: Dict[str, Any], threshold: float = 0.2) -> bool:
+    """
+    Check if event meets minimum quality threshold.
+    
+    Args:
+        event: Event dictionary
+        threshold: Minimum quality score (default 0.2)
         
-        # Allow some conference-like keywords but not too many
-        return non_hackathon_count <= 2
-
-# Convenience functions
-def filter_future_target_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Filter events to only future events in target locations."""
-    filter_instance = EventFilter()
-    return filter_instance.filter_events(events)
-
-def create_custom_filter(target_locations: List[str] = None, 
-                        additional_invalid_patterns: List[str] = None) -> EventFilter:
-    """Create a custom event filter with specific configuration."""
-    config = FilterConfig()
+    Returns:
+        True if event meets quality threshold
+    """
+    # Calculate basic quality score if not present
+    if 'quality_score' not in event:
+        score = calculate_basic_quality_score(event)
+    else:
+        score = event.get('quality_score', 0)
     
-    if target_locations:
-        config.target_locations = target_locations
-    
-    if additional_invalid_patterns:
-        config.invalid_patterns.extend(additional_invalid_patterns)
-    
-    return EventFilter(config)
+    return score >= threshold
 
-# Legacy compatibility
-def is_target_location(event: Dict[str, Any]) -> Tuple[bool, str]:
-    """Legacy function for backward compatibility."""
-    filter_instance = EventFilter()
-    result = filter_instance.is_target_location(event.get('location', ''))
-    return result, "target location" if result else "not target location"
 
-def is_future_event(event: Dict[str, Any]) -> Tuple[bool, str]:
-    """Legacy function for backward compatibility."""
-    filter_instance = EventFilter()
-    result = filter_instance._is_future_event(event.get('start_date', ''))
-    return result, "future event" if result else "past event" 
+def calculate_basic_quality_score(event: Dict[str, Any]) -> float:
+    """
+    Calculate a basic quality score for an event.
+    
+    Args:
+        event: Event dictionary
+        
+    Returns:
+        Quality score between 0 and 1
+    """
+    score = 0.0
+    
+    # Has name
+    if event.get('name') and event['name'] != 'TBD':
+        score += 0.3
+    
+    # Has URL
+    if event.get('url'):
+        score += 0.2
+    
+    # Has date
+    if event.get('start_date') and event['start_date'] != 'TBD':
+        score += 0.2
+    
+    # Has location
+    if event.get('location') and event['location'] != 'TBD':
+        score += 0.2
+    
+    # Has description
+    if event.get('description'):
+        score += 0.1
+    
+    return min(score, 1.0)
+
+
+def filter_by_date_range(events: List[Dict[str, Any]], 
+                        start_date: Optional[date] = None,
+                        end_date: Optional[date] = None) -> List[Dict[str, Any]]:
+    """
+    Filter events by date range.
+    
+    Args:
+        events: List of event dictionaries
+        start_date: Start of date range (inclusive)
+        end_date: End of date range (inclusive)
+        
+    Returns:
+        List of events within date range
+    """
+    filtered = []
+    
+    for event in events:
+        event_start = DateParser.parse_to_date(event.get('start_date'))
+        
+        if not event_start:
+            # Include events without dates if no start_date filter
+            if not start_date:
+                filtered.append(event)
+            continue
+        
+        # Check date range
+        if start_date and event_start < start_date:
+            continue
+        
+        if end_date and event_start > end_date:
+            continue
+        
+        filtered.append(event)
+    
+    return filtered
+
+
+def filter_by_keywords(events: List[Dict[str, Any]], 
+                      keywords: List[str],
+                      fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    Filter events by keywords in specified fields.
+    
+    Args:
+        events: List of event dictionaries
+        keywords: List of keywords to search for
+        fields: List of fields to search in (default: name, description, themes)
+        
+    Returns:
+        List of events matching keywords
+    """
+    if not keywords:
+        return events
+    
+    if not fields:
+        fields = ['name', 'description', 'themes']
+    
+    filtered = []
+    keywords_lower = [k.lower() for k in keywords]
+    
+    for event in events:
+        # Build searchable text from specified fields
+        search_text = ''
+        for field in fields:
+            value = event.get(field)
+            if value:
+                if isinstance(value, list):
+                    search_text += ' '.join(str(v) for v in value) + ' '
+                else:
+                    search_text += str(value) + ' '
+        
+        search_text = search_text.lower()
+        
+        # Check if any keyword matches
+        if any(keyword in search_text for keyword in keywords_lower):
+            filtered.append(event)
+    
+    return filtered
+
+
+def filter_tech_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter events to only include tech-related events.
+    
+    Args:
+        events: List of event dictionaries
+        
+    Returns:
+        List of tech-related events
+    """
+    tech_keywords = [
+        'ai', 'artificial intelligence', 'machine learning', 'ml', 'deep learning',
+        'data science', 'data', 'analytics', 'tech', 'technology', 'software',
+        'programming', 'coding', 'developer', 'engineering', 'startup', 'innovation',
+        'blockchain', 'crypto', 'web3', 'cloud', 'devops', 'security', 'cyber',
+        'iot', 'robotics', 'ar', 'vr', 'metaverse', 'quantum', 'api', 'saas',
+        'fintech', 'healthtech', 'edtech', 'biotech', 'cleantech'
+    ]
+    
+    non_tech_keywords = [
+        'real estate', 'property', 'mortgage', 'insurance', 'accounting',
+        'legal', 'law', 'fitness', 'gym', 'yoga', 'cooking', 'fashion',
+        'beauty', 'cosmetics', 'entertainment', 'music', 'film', 'art',
+        'painting', 'sculpture', 'dance', 'theater', 'literature'
+    ]
+    
+    filtered = []
+    
+    for event in events:
+        # Build searchable text
+        search_text = f"{event.get('name', '')} {event.get('description', '')} {' '.join(event.get('themes', []))}"
+        search_text = search_text.lower()
+        
+        # Skip if contains non-tech keywords
+        if any(keyword in search_text for keyword in non_tech_keywords):
+            continue
+        
+        # Include if contains tech keywords
+        if any(keyword in search_text for keyword in tech_keywords):
+            filtered.append(event)
+    
+    return filtered
+
+
+def deduplicate_events(events: List[Dict[str, Any]], key: str = 'url') -> List[Dict[str, Any]]:
+    """
+    Remove duplicate events based on a key field.
+    
+    Args:
+        events: List of event dictionaries
+        key: Field to use for deduplication (default: 'url')
+        
+    Returns:
+        List of unique events
+    """
+    seen = set()
+    unique = []
+    
+    for event in events:
+        value = event.get(key)
+        if value:
+            value_normalized = str(value).strip().lower()
+            if value_normalized not in seen:
+                seen.add(value_normalized)
+                unique.append(event)
+        else:
+            # Keep events without the key field
+            unique.append(event)
+    
+    return unique 

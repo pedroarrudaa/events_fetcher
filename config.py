@@ -1,4 +1,3 @@
-# Configuration constants to replace magic numbers throughout the project
 # This file consolidates all hard-coded values for better maintainability
 
 import os
@@ -22,8 +21,8 @@ OPENAI_TIMEOUT_WRITE = 60.0
 OPENAI_TIMEOUT_CONNECT = 10.0
 
 # GPT Processing Configuration
-GPT_MODEL_STANDARD = "gpt-3.5-turbo"          # Standard GPT model
-GPT_MODEL_ADVANCED = "gpt-4"
+GPT_MODEL_STANDARD = "gpt-4.1-mini"          # Standard GPT model
+GPT_MODEL_ADVANCED = "gpt-4.1-mini"
 GPT_TEMPERATURE_STANDARD = 0.1                 # Low temperature for consistent extraction
 GPT_TIMEOUT_STANDARD = 60                      # GPT request timeout
 GPT_MAX_CONTENT_CHARS = 12000                  # Conservative limit for GPT content
@@ -63,7 +62,7 @@ MAX_RAW_RESPONSE_DISPLAY = 500  # Maximum raw response length to display
 MAX_ERROR_RESPONSE_DISPLAY = 200  # Maximum error response length
 
 # Summary Configuration
-MAX_CITIES_DISPLAY = 10         # Maximum cities to show in summary
+MAX_CITIES_DISPLAY = 20         # Maximum cities to show in summary
 MAX_TOPICS_DISPLAY = 15         # Maximum topics to show in summary
 MAX_EXAMPLES_DISPLAY = 3        # Maximum examples to show
 MAX_QUALITY_EXAMPLES = 3        # Maximum quality examples
@@ -82,6 +81,24 @@ MAX_POOL_SIZE = 10
 POOL_TIMEOUT = 30
 STATEMENT_TIMEOUT = 60000       # 60 seconds
 
+# Additional Database Configuration Constants
+DB_MAX_OVERFLOW = 20            # Maximum database connection overflow
+DB_POOL_RECYCLE = 3600          # Pool recycle time in seconds (1 hour)
+DB_DEFAULT_BATCH_SIZE = 1000    # Default batch size for bulk operations
+DB_URL_ENRICHED_BATCH_SIZE = 500  # Batch size for marking URLs as enriched
+
+# Database Field Length Limits
+DB_EVENT_NAME_MAX_LENGTH = 500      # Maximum event name length
+DB_EVENT_URL_MAX_LENGTH = 1000      # Maximum event URL length
+DB_EVENT_DATE_MAX_LENGTH = 100      # Maximum date field length
+DB_EVENT_LOCATION_MAX_LENGTH = 200  # Maximum location field length
+DB_EVENT_CITY_MAX_LENGTH = 100      # Maximum city field length
+DB_EVENT_TICKET_PRICE_MAX_LENGTH = 100  # Maximum ticket price field length
+DB_EVENT_SOURCE_MAX_LENGTH = 100    # Maximum source field length
+
+# Database Query Configuration
+DB_RECENT_EVENTS_DAYS = 30      # Days to look back for recent events
+
 # Source-specific Configuration
 MAX_PAGES_EVENTBRITE = 5        # Maximum pages to scrape from Eventbrite
 MAX_PAGES_DEVPOST = 10          # Maximum pages to scrape from Devpost
@@ -92,7 +109,7 @@ MIN_CONTENT_QUALITY_SCORE = 0.5  # Minimum content quality to accept
 MIN_DATA_COMPLETENESS = 0.3       # Minimum data completeness required
 
 # Parallel Processing Configuration
-MAX_CONCURRENT_EXTRACTIONS = 5   # Maximum concurrent GPT extractions
+MAX_CONCURRENT_EXTRACTIONS = None   # Maximum concurrent GPT extractions
 DEFAULT_BATCH_SIZE = 10          # Default batch size for parallel processing
 DEFAULT_MAX_WORKERS = 5          # Default maximum workers for thread pools 
 
@@ -147,7 +164,7 @@ BATCH_SIZE_DEFAULT = 10
 
 # Discovery limits
 MAX_CONFERENCES_DEFAULT = 200
-MAX_HACKATHONS_DEFAULT = 60
+MAX_HACKATHONS_DEFAULT = 200
 
 # Site-specific configuration
 CONFERENCE_SITES = [
@@ -168,5 +185,50 @@ CONFERENCE_SITES = [
 # Rate limiting
 REQUEST_DELAY = 1.0
 
-# Disable Crawl4AI due to dependency conflicts - system works fine without it
-CRAWL4AI_AVAILABLE = False 
+# Enable Crawl4AI for enhanced scraping capabilities
+CRAWL4AI_AVAILABLE = True
+
+# Events Dashboard Runner Configuration
+BANNER_WIDTH = 80                       # Width of banners and separators
+SECTION_SEPARATOR_WIDTH = 50            # Width of section separators
+DEFAULT_EVENT_LIMIT = 5                 # Default limit for events per type
+DEFAULT_DISCOVERY_EVENTS = 10           # Default events for discovery testing
+TEST_CONCURRENCY_LIMIT = 2              # Concurrency limit for testing
+DISCOVERY_CONCURRENCY_LIMIT = 2         # Concurrency limit for discovery
+SAMPLE_RESULTS_DISPLAY_COUNT = 3        # Number of sample results to display
+MAX_ERRORS_DISPLAY = 3                  # Maximum errors to display in reports
+URL_DISPLAY_LENGTH = 50                 # Length for URL display truncation
+TITLE_DISPLAY_LENGTH = 40               # Length for title display truncation
+DECIMAL_PLACES = 2                      # Decimal places for time formatting
+STATS_COLUMN_WIDTH = 12                 # Column width for statistics display
+STATS_NUMBER_WIDTH = 3                  # Number width for statistics display
+
+# Crawl4AI Configuration
+CRAWL4AI_CONTENT_THRESHOLD = 0.3        # Content filtering threshold
+CRAWL4AI_MIN_WORDS = 5                  # Minimum words threshold
+CRAWL4AI_DELAY_BEFORE_RETURN = 3.0      # Delay before returning HTML
+CRAWL4AI_JS_WAIT_SHORT = 1000           # Short JavaScript wait time (ms)
+CRAWL4AI_PAGE_TIMEOUT = 15000           # Page timeout (ms)
+CRAWL4AI_MAX_CONCURRENT = 3             # Default max concurrent requests
+CRAWL4AI_MAX_EVENTS = 20                # Default max events to discover
+CRAWL4AI_BATCH_SLEEP = 2                # Sleep between batches (seconds)
+CRAWL4AI_LISTING_TIMEOUT = 5000         # Timeout for listing pages (ms)
+CRAWL4AI_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Event Sources Configuration (unified for conferences and hackathons)
+EVENT_MAX_RESULTS_CONFERENCE = 200      # Default maximum conference results
+EVENT_MAX_RESULTS_HACKATHON = 60        # Default maximum hackathon results
+EVENT_TAVILY_MAX_RESULTS = 6            # Results per Tavily query
+EVENT_TAVILY_SLEEP = 0.4                # Sleep between Tavily queries (seconds)
+EVENT_SITE_SCRAPING_SLEEP = 1           # Sleep between site scraping (seconds)
+EVENT_SOURCE_SLEEP = 2                  # Sleep between different sources (seconds)
+EVENT_DESCRIPTION_MAX_LENGTH = 300      # Maximum description length
+EVENT_NAME_MAX_LENGTH = 100             # Maximum event name length
+EVENT_MIN_TEXT_LENGTH = 10              # Minimum text length for filtering
+EVENT_MIN_LINK_TEXT_LENGTH = 5          # Minimum link text length
+EVENT_AGGREGATOR_EXPANSION_LIMIT = 20   # Maximum results from aggregator expansion
+EVENT_QUALITY_BASE_SCORE = 0.5          # Base quality score
+EVENT_QUALITY_BONUS_INCREMENT = 0.1     # Quality score increment
+EVENT_QUALITY_MAX_SCORE = 1.0           # Maximum quality score
+EVENT_API_TIMEOUT = 15                  # API request timeout (seconds)
+EVENT_API_PER_PAGE = 20                 # API results per page 

@@ -1,5 +1,8 @@
 """
-FastAPI backend for serving unified events data from hackathons and conferences tables.
+FastAPI backend for serving unified events data.
+
+This backend now uses the EventService layer for all business logic,
+providing a clean separation of concerns.
 """
 import os
 from datetime import datetime, date
@@ -8,11 +11,17 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from database_utils import get_db_manager, Hackathon, Conference, save_event_action, get_event_action
-from shared_utils import DateParser
 from sqlalchemy.exc import SQLAlchemyError
 
-app = FastAPI(title="Events API", description="API for managing hackathons and conferences", version="1.0.0")
+from event_service import get_event_service, EventService
+from event_repository import EventType
+from shared_utils import logger
+
+app = FastAPI(
+    title="Events API", 
+    description="Unified API for managing hackathons and conferences", 
+    version="2.0.0"
+)
 
 # Get frontend URL from environment variable for production
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -22,16 +31,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://events-dashboard-nprw.onrender.com",
-        "https://events-api-nprw.onrender.com"
+        FRONTEND_URL,
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class Event(BaseModel):
-    """Pydantic model for unified event response."""
+# Initialize service
+event_service: EventService = get_event_service()
+
+
+class EventResponse(BaseModel):
+    """Unified event response model."""
     id: str
     title: str
     type: str  # "hackathon" or "conference"
@@ -40,249 +52,264 @@ class Event(BaseModel):
     end_date: str
     url: str
     status: str  # "validated", "filtered", or "enriched"
+    quality_score: float
+    is_upcoming: bool
+    days_until: Optional[int]
+
 
 class EventActionRequest(BaseModel):
-    """Pydantic model for event action requests."""
+    """Event action request model."""
     event_id: str
     event_type: str  # "hackathon" or "conference"
-    action: str  # "archive" or "reached_out"
+    action: str  # "archive", "reached_out", etc.
+
 
 class EventActionResponse(BaseModel):
-    """Pydantic model for event action responses."""
+    """Event action response model."""
     action: str
     timestamp: str
 
-def normalize_event_data(event_obj, event_type: str) -> Event:
-    """
-    Convert database object to unified Event model.
-    """
-    # Handle both SQLAlchemy objects and dictionaries
-    if hasattr(event_obj, '__dict__'):
-        data = {
-            'id': str(event_obj.id),
-            'name': event_obj.name,
-            'url': event_obj.url,
-            'location': event_obj.location or 'TBD',
-            'start_date': event_obj.start_date or 'TBD',
-            'end_date': event_obj.end_date or 'TBD',
-        }
-    else:
-        data = event_obj
 
-    # Determine status based on data completeness
-    status = "validated"  # Default status
-    if not data.get('start_date') or data.get('start_date') == 'TBD':
-        status = "filtered"
-    elif data.get('location') and data.get('location') != 'TBD' and data.get('start_date') != 'TBD':
-        status = "enriched"
+class EventDiscoveryRequest(BaseModel):
+    """Event discovery request model."""
+    event_type: str  # "hackathon" or "conference"
+    max_results: Optional[int] = None
+    enrich: bool = True
 
-    return Event(
-        id=data.get('id', ''),
-        title=data.get('name', 'Untitled Event'),
-        type=event_type,
-        location=data.get('location', 'TBD'),
-        start_date=data.get('start_date', 'TBD'),
-        end_date=data.get('end_date', 'TBD'),
-        url=data.get('url', ''),
-        status=status
+
+def event_to_response(event: Dict[str, Any]) -> EventResponse:
+    """Convert service event to API response."""
+    return EventResponse(
+        id=event.get('id', ''),
+        title=event.get('name', 'Untitled Event'),
+        type=event.get('event_type', 'unknown'),
+        location=event.get('location', 'TBD'),
+        start_date=event.get('start_date', 'TBD'),
+        end_date=event.get('end_date', 'TBD'),
+        url=event.get('url', ''),
+        status=event.get('status', 'filtered'),
+        quality_score=event.get('quality_score', 0.0),
+        is_upcoming=event.get('is_upcoming', True),
+        days_until=event.get('days_until')
     )
 
-def parse_date_string(date_str: str) -> Optional[date]:
-    """
-    Parse various date string formats to datetime.date object.
-    Uses unified DateParser for consistency across the application.
-    """
-    return DateParser.parse_to_date(date_str)
 
-def is_event_future_only(start_date_str: str, end_date_str: str = None) -> bool:
-    """
-    Check if an event is in the future (hasn't started yet).
-    Only return True for events that start in the future.
-    Uses unified DateParser for consistency.
-    """
-    return DateParser.is_future_date(start_date_str)
-
-def get_event_sort_key(event: Event) -> tuple:
-    """
-    Generate a sort key for events. Events with valid dates come first,
-    sorted by start date. Events without valid dates come last.
-    """
-    start_date = parse_date_string(event.start_date)
-    
-    if start_date is None:
-        # Events without valid dates go to the end
-        return (1, date.max)
-    else:
-        # Events with valid dates come first, sorted by date
-        return (0, start_date)
-
-@app.get("/events", response_model=List[Event])
+@app.get("/events", response_model=List[EventResponse])
 async def get_events(
     type_filter: Optional[str] = Query(None, description="Filter by event type: hackathon, conference"),
     location_filter: Optional[str] = Query(None, description="Filter by location"),
     status_filter: Optional[str] = Query(None, description="Filter by status: validated, filtered, enriched"),
     limit: Optional[int] = Query(None, description="Limit number of results"),
     offset: int = Query(0, description="Number of records to skip for pagination"),
-    include_past: bool = Query(False, description="Include events that have already started/ended")
+    include_past: bool = Query(False, description="Include events that have already started/ended"),
+    sort_by: str = Query("created_at", description="Sort by: created_at, start_date, quality_score, name")
 ):
     """
-    High-performance unified list of events with optimized database queries.
-    Events are filtered to show only future events (that haven't started yet) by default and sorted by start date.
+    Get events with filtering, pagination, and sorting.
+    
+    Uses the EventService for all business logic, providing consistent
+    quality scores, status determination, and date calculations.
     """
     try:
-        def get_optimized_events():
-            """Get events using optimized database operations."""
-            db_manager = get_db_manager()
-            events = []
-            
-            with db_manager.get_session() as session:
-                # Build efficient database filters
-                def build_query(model_class):
-                    query = session.query(model_class).order_by(model_class.created_at.desc())
-                    
-                    # Apply database-level filters for better performance
-                    if location_filter and location_filter.lower() != "all":
-                        query = query.filter(model_class.location.ilike(f'%{location_filter}%'))
-                    
-                    return query
-                
-                # Efficiently fetch hackathons
-                if not type_filter or type_filter.lower() in ['hackathon', 'all']:
-                    hackathons_query = build_query(Hackathon)
-                    # Don't limit initially, we'll sort and limit later
-                    if offset:
-                        hackathons_query = hackathons_query.offset(offset // 2)
-                    
-                    # Use yield_per for memory efficiency with large datasets
-                    for hackathon in hackathons_query.yield_per(100):
-                        event = normalize_event_data(hackathon, "hackathon")
-                        
-                        # Filter out past events unless specifically requested
-                        if not include_past and not is_event_future_only(event.start_date, event.end_date):
-                            continue
-                        
-                        # Apply status filter efficiently
-                        if status_filter and status_filter.lower() != "all":
-                            if event.status.lower() != status_filter.lower():
-                                continue
-                        
-                        events.append(event)
-                
-                # Efficiently fetch conferences
-                if not type_filter or type_filter.lower() in ['conference', 'all']:
-                    conferences_query = build_query(Conference)
-                    if offset:
-                        conferences_query = conferences_query.offset(offset // 2)
-                    
-                    # Use yield_per for memory efficiency
-                    for conference in conferences_query.yield_per(100):
-                        event = normalize_event_data(conference, "conference")
-                        
-                        # Filter out past events unless specifically requested
-                        if not include_past and not is_event_future_only(event.start_date, event.end_date):
-                            continue
-                        
-                        # Apply status filter efficiently
-                        if status_filter and status_filter.lower() != "all":
-                            if event.status.lower() != status_filter.lower():
-                                continue
-                        
-                        events.append(event)
-                
-                # Sort events by start date (closest first)
-                def get_sort_date(event):
-                    """Get date for sorting, with fallback"""
-                    parsed = parse_date_string(event.start_date)
-                    if parsed is None:
-                        return date.max  # Put events without dates at the end
-                    return parsed
-                
-                # Sort events: valid dates first (by date), then events without dates
-                events.sort(key=lambda event: (
-                    0 if parse_date_string(event.start_date) is not None else 1,  # Valid dates first
-                    get_sort_date(event),  # Then by date
-                    event.title  # Then by title as tiebreaker
-                ))
-                
-                # Apply final limit after sorting
-                if limit:
-                    events = events[:limit]
-                
-                return events
+        # Map type filter to EventType
+        event_type: EventType = 'all'
+        if type_filter:
+            if type_filter.lower() == 'hackathon':
+                event_type = 'hackathon'
+            elif type_filter.lower() == 'conference':
+                event_type = 'conference'
         
-        return get_optimized_events()
+        # Build filters
+        filters = {}
+        if location_filter and location_filter.lower() != "all":
+            filters['location'] = location_filter
+        
+        # Get events from service
+        events = event_service.get_events(
+            event_type=event_type,
+            filters=filters,
+            limit=limit,
+            offset=offset,
+            include_past=include_past,
+            sort_by=sort_by
+        )
+        
+        # Apply status filter if provided
+        if status_filter and status_filter.lower() != "all":
+            events = [e for e in events if e.get('status', '').lower() == status_filter.lower()]
+        
+        # Convert to response model
+        return [event_to_response(event) for event in events]
         
     except SQLAlchemyError as e:
-        print(f"❌ Database error in /events: {e}")
-        raise HTTPException(status_code=503, detail=f"Database connection error: {str(e)}")
+        logger.log("error", "Database error in /events", error=str(e))
+        raise HTTPException(status_code=503, detail="Database connection error")
     except Exception as e:
-        print(f"❌ Error fetching events: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.log("error", "Error fetching events", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/")
-async def root():
-    """Health check endpoint."""
-    return {"message": "Events API is running", "version": "1.0.1", "sorting": "updated"}
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint with database connectivity test."""
+@app.get("/events/search", response_model=List[EventResponse])
+async def search_events(
+    q: str = Query(..., description="Search query"),
+    type_filter: Optional[str] = Query(None, description="Filter by event type"),
+    limit: int = Query(50, description="Maximum results")
+):
+    """
+    Search events by name, location, or description.
+    
+    Returns results sorted by relevance score.
+    """
     try:
-        db_manager = get_db_manager()
-        with db_manager.get_session() as session:
-            # Test database connection
-            hackathon_count = session.query(Hackathon).count()
-            conference_count = session.query(Conference).count()
+        # Map type filter
+        event_type: EventType = 'all'
+        if type_filter:
+            if type_filter.lower() == 'hackathon':
+                event_type = 'hackathon'
+            elif type_filter.lower() == 'conference':
+                event_type = 'conference'
+        
+        # Search using service
+        results = event_service.search_events(q, event_type, limit)
+        
+        # Convert to response model
+        return [event_to_response(event) for event in results]
+        
+    except Exception as e:
+        logger.log("error", "Error searching events", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/events/discover")
+async def discover_events(request: EventDiscoveryRequest):
+    """
+    Discover and save new events.
+    
+    This endpoint triggers event discovery, enrichment, and saving.
+    """
+    try:
+        # Validate event type
+        if request.event_type not in ['hackathon', 'conference']:
+            raise HTTPException(status_code=400, detail="Invalid event type")
+        
+        # Run discovery
+        results = event_service.discover_and_save_events(
+            event_type=request.event_type,
+            max_results=request.max_results,
+            enrich=request.enrich
+        )
         
         return {
-            "status": "healthy",
-            "database": "connected",
-            "hackathons": hackathon_count,
-            "conferences": conference_count
+            "success": True,
+            "results": results,
+            "message": f"Successfully discovered and saved {results['saved']} new {request.event_type}s"
         }
+        
     except Exception as e:
-        return {
-            "status": "healthy",
-            "database": "disconnected",
-            "error": str(e)
-        }
+        logger.log("error", "Error discovering events", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Discovery failed: {str(e)}")
+
 
 @app.post("/event-action")
 async def create_event_action(request: EventActionRequest):
     """
-    Create a new manual action for an event.
+    Record an action taken on an event.
+    
+    Valid actions: archive, reached_out, interested, not_interested, applied
     """
     try:
-        success = save_event_action(request.event_id, request.event_type, request.action)
+        success, error = event_service.record_event_action(
+            request.event_id,
+            request.event_type,
+            request.action
+        )
         
         if success:
-            return {"message": "Action saved successfully", "success": True}
+            return {"message": "Action recorded successfully", "success": True}
         else:
-            raise HTTPException(status_code=400, detail="Failed to save action")
+            raise HTTPException(status_code=400, detail=error)
             
     except Exception as e:
-        print(f"Error creating event action: {e}")
+        logger.log("error", "Error creating event action", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @app.get("/event-action/{event_id}")
-async def get_event_action_endpoint(event_id: str):
+async def get_event_actions(event_id: str):
     """
-    Get the latest action for an event.
+    Get all actions for an event.
+    
+    Returns the complete action history for the event.
     """
     try:
-        action_data = get_event_action(event_id)
+        actions = event_service.get_event_history(event_id)
         
-        if action_data:
+        if actions:
+            # Return the most recent action in the expected format
+            latest = actions[0]
             return EventActionResponse(
-                action=action_data['action'],
-                timestamp=action_data['timestamp']
+                action=latest['action'],
+                timestamp=latest['timestamp']
             )
         else:
             return None
             
     except Exception as e:
-        print(f"Error getting event action: {e}")
+        logger.log("error", "Error getting event actions", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.get("/stats")
+async def get_statistics():
+    """
+    Get comprehensive event statistics.
+    
+    Returns counts, averages, and other useful metrics.
+    """
+    try:
+        stats = event_service.get_statistics()
+        return stats
+        
+    except Exception as e:
+        logger.log("error", "Error getting statistics", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint."""
+    return {
+        "message": "Events API is running",
+        "version": "2.0.0",
+        "features": ["unified-events", "search", "discovery", "actions", "statistics"]
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """
+    Detailed health check with database connectivity test.
+    """
+    try:
+        # Get basic stats to test database
+        stats = event_service.get_statistics()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "total_events": stats.get('total_events', 0),
+            "hackathons": stats.get('total_hackathons', 0),
+            "conferences": stats.get('total_conferences', 0),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 
 if __name__ == "__main__":
     import uvicorn

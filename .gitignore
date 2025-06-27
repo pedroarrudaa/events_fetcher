@@ -138,4 +138,14 @@ tmp/
 temp/
 
 # Local deployment test files
-test_deployment.py 
+test_deployment.py
+
+# Event export files
+sf_conferences.json
+ny_conferences.json
+sf_hackathons.json
+ny_hackathons.json
+online_hackathons.json
+all_hackathons.json
+events_export_*.json
+events_export_*.csv 

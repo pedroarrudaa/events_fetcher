@@ -1,259 +1,147 @@
-# Events Fetcher 🎯
+# Events Dashboard
 
-[![GitHub](https://img.shields.io/badge/GitHub-pedroarrudaa%2Fevents_fetcher-blue?logo=github)](https://github.com/pedroarrudaa/events_fetcher)
+A unified platform for discovering and tracking AI conferences and hackathons in San Francisco, New York, and online.
 
-**Enhanced AI/Tech Events Dashboard** with comprehensive conference and hackathon fetching, Tavily integration, and advanced filtering capabilities for San Francisco and New York events.
+## Features
 
-## ✨ Features
+- 🔍 **Smart Event Discovery**: Automatically discovers AI conferences in SF/NY and hackathons (including online)
+- 🤖 **AI-Powered Enrichment**: Uses GPT to extract detailed event information
+- 📊 **Advanced Filtering**: Filter by location, type, and upcoming events
+- 🗄️ **PostgreSQL Database**: Efficient storage with unified events table
+- 🌐 **RESTful API**: FastAPI backend with search, filtering, and statistics
+- 🎨 **Modern UI**: React frontend with export functionality and quality metrics
+- 📅 **Calendar Ready**: Export events for your calendars (generativeaisf.com, lu.ma/genai-ny)
 
-### 🔍 **Multi-Source Event Discovery**
-- **Conference Sources**: Eventbrite, Meetup, Luma, TechMeme, AI/ML Events
-- **Hackathon Sources**: DevPost, Major League Hacking, university platforms
-- **Tavily AI Search**: Enhanced with Luma-specific queries for SF/NYC events
-- **Crawl4AI Integration**: Advanced web scraping with structured data extraction
+## Quick Start
 
-### 🎯 **Smart Filtering & Validation**
-- **Strict Date Filtering**: Only future events (no 30-day grace period)
-- **Location Standardization**: Normalizes to "San Francisco" or "New York"
-- **Quality Validation**: Removes parsing errors, duplicates, and invalid entries
-- **Target Location Filtering**: Focuses on SF Bay Area and NYC events
-
-### 🤖 **AI-Powered Enrichment**
-- **GPT-4 Event Enrichment**: Extracts structured data from event pages
-- **Parallel Processing**: Efficient concurrent event processing
-- **Content Enhancement**: Fills missing dates, descriptions, and details
-- **Error Handling**: Robust fallback mechanisms
-
-### 🗄️ **Database Management**
-- **SQLite Database**: Efficient storage with proper indexing
-- **Bulk Operations**: Optimized save/update operations
-- **Automatic Cleanup**: Removes past and invalid events
-- **Event Tracking**: Action logging and analytics
-
-## 🚀 Quick Start
-
-### Prerequisites
+### 1. Install Dependencies
 ```bash
-# Python 3.8+
-python --version
-
-# Node.js 16+ (for frontend)
-node --version
-```
-
-### Installation
-```bash
-# Clone repository
-git clone https://github.com/pedroarrudaa/events_fetcher.git
-cd events_fetcher
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install Python dependencies
 pip install -r requirements.txt
-
-# Install Crawl4AI
-pip install crawl4ai
-crawl4ai-setup
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install
 ```
 
-### Environment Setup
+### 2. Set Up Environment
 ```bash
-# Copy environment template
 cp .env.example .env
-
-# Add your API keys
-echo "OPENAI_API_KEY=your_openai_key_here" >> .env
-echo "TAVILY_API_KEY=your_tavily_key_here" >> .env
+# Edit .env with your API keys (OpenAI, Tavily, etc.)
 ```
 
-## 🎮 Usage
-
-### Start Backend & Frontend
+### 3. Initialize Database
 ```bash
-# Start backend API (port 8000)
-./venv/bin/python -m uvicorn backend:app --reload --host 0.0.0.0 --port 8000
-
-# Start frontend (port 3000)
-cd frontend && npm start
+python events_cli.py init-db
 ```
 
-### Fetch Events
+### 4. Discover Events
+
+**For AI Conferences in SF & NY:**
 ```bash
-# Fetch conferences (with limit)
-./venv/bin/python run_events_with_crawl4ai.py
-
-# Fetch specific type with limit
-./venv/bin/python -c "from event_fetcher import run_event_fetcher; run_event_fetcher('conference', 50)"
-./venv/bin/python -c "from event_fetcher import run_event_fetcher; run_event_fetcher('hackathon', 30)"
+python discover_conferences.py
+# Creates: sf_conferences.json, ny_conferences.json
 ```
 
-### Database Maintenance
+**For Hackathons (SF, NY, Online):**
 ```bash
-# Clean past events
-./venv/bin/python clean_past_events.py
-
-# View database stats
-./venv/bin/python -c "
-from database_utils import get_db_manager
-db = get_db_manager()
-print(db.get_database_stats())
-"
+python discover_hackathons.py
+# Creates: sf_hackathons.json, ny_hackathons.json, online_hackathons.json
 ```
 
-## 🏗️ Architecture
-
-### Core Components
-- **`event_fetcher.py`**: Unified fetching pipeline
-- **`event_filters.py`**: Advanced filtering and validation
-- **`crawl4ai_integration.py`**: Web scraping with AI extraction
-- **`database_utils.py`**: Database operations and management
-- **`backend.py`**: FastAPI REST API server
-- **`frontend/`**: React dashboard interface
-
-### Data Flow
-```
-Sources → Raw Events → Filtering → Enrichment → Database → API → Frontend
-    ↓         ↓           ↓          ↓         ↓       ↓       ↓
-Tavily     Crawl4AI    EventFilter  GPT-4   SQLite  FastAPI React
-Luma       DevPost     Date/Loc     Enrich  Bulk    REST    Dashboard
-EventBrite Meetup      Validation   Content Save    API     
-```
-
-## 🔧 Configuration
-
-### Filter Settings (`event_filters.py`)
-```python
-@dataclass
-class FilterConfig:
-    target_locations = ['san francisco', 'sf', 'bay area', 'nyc', 'new york']
-    invalid_patterns = [r'^test\s+event', r'^placeholder', ...]
-    non_hackathon_keywords = ['summit', 'conference', 'workshop', ...]
-```
-
-### Source Configuration (`fetchers/sources/`)
-- **Conference Sources**: EventBrite, Luma SF/NYC, Meetup, TechMeme
-- **Hackathon Sources**: DevPost, MLH, University platforms
-- **Tavily Queries**: Enhanced with Luma-specific searches
-
-## 📊 API Endpoints
-
-### Events API
+**Or use the CLI for more control:**
 ```bash
-# Get all events
-GET /events
+# Discover all events
+python events_cli.py discover
 
-# Filter by type
-GET /events?type=conference
-GET /events?type=hackathon
+# Discover only conferences
+python events_cli.py discover --type conference --limit 100
 
-# Filter by location
-GET /events?location=San Francisco
-
-# Health check
-GET /health
+# Discover only hackathons
+python events_cli.py discover --type hackathon --limit 50
 ```
 
-### Response Format
-```json
-{
-  "id": "uuid",
-  "title": "Event Name",
-  "type": "conference|hackathon",
-  "location": "San Francisco",
-  "start_date": "2025-07-15",
-  "end_date": "2025-07-16",
-  "url": "https://example.com",
-  "status": "enriched"
-}
+### 5. Start the Application
+
+**Backend API:**
+```bash
+python events_cli.py serve
+# API runs at http://localhost:8000
+# Docs at http://localhost:8000/docs
 ```
 
-## 🎯 Enhanced Features
-
-### 🔍 **Tavily Integration**
-- **Luma-Specific Queries**: `lu.ma "AI conference" San Francisco 2025`
-- **Enhanced Discovery**: Finds conferences missed by direct scraping
-- **Smart Rate Limiting**: Respects API limits with early stopping
-
-### 🧹 **Database Cleanup**
-- **Past Event Removal**: Automatically filters events before current date
-- **Location Standardization**: Converts all variations to standard format
-- **Duplicate Detection**: Removes multiple entries for same event
-- **Quality Validation**: Removes parsing errors and invalid entries
-
-### ⚡ **Performance Optimizations**
-- **Parallel Processing**: Concurrent event enrichment
-- **Bulk Database Operations**: Efficient save/update operations
-- **Smart Caching**: Reduces redundant API calls
-- **Early Stopping**: Respects rate limits and quotas
-
-## 🛠️ Development
-
-### Project Structure
-```
-events_fetcher/
-├── backend.py              # FastAPI server
-├── event_fetcher.py        # Main fetching pipeline
-├── event_filters.py        # Filtering and validation
-├── database_utils.py       # Database operations
-├── crawl4ai_integration.py # Web scraping
-├── config.py              # Configuration
-├── requirements.txt       # Python dependencies
-├── fetchers/
-│   ├── sources/           # Event source modules
-│   └── enrichers/         # GPT enrichment modules
-├── frontend/              # React dashboard
-└── venv/                 # Python virtual environment
+**Frontend UI:**
+```bash
+cd frontend
+npm start
+# UI runs at http://localhost:3000
 ```
 
-### Key Improvements
-- ✅ **Fixed Date Filtering**: Removed 30-day grace period
-- ✅ **Enhanced Luma Integration**: Added SF/NYC specific sources
-- ✅ **Improved Validation**: Better quality checks and filtering
-- ✅ **Database Optimization**: Bulk operations and cleanup utilities
-- ✅ **Error Handling**: Robust fallback mechanisms
+## Key Scripts
 
-## 📈 Stats
+### `discover_conferences.py`
+Focused script for discovering AI conferences in San Francisco and New York:
+- Filters specifically for AI/ML/GenAI conferences
+- Exports separate JSON files for each city
+- Ready for calendar upload
 
-### Current Database (Clean)
-- **9 Valid Conferences**: All future, SF/NYC only
-- **14+ Hackathons**: Properly filtered and enriched
-- **100% Quality**: No parsing errors or duplicates
-- **Standardized Locations**: Consistent "San Francisco"/"New York" format
+### `discover_hackathons.py`
+Discovers hackathons including online events:
+- Categorizes by location (SF, NY, Online)
+- Identifies AI-focused hackathons
+- Exports organized JSON files
 
-### Sources Coverage
-- **EventBrite**: SF/NYC AI events
-- **Luma**: Both direct scraping + Tavily queries
-- **Meetup**: Microsoft Reactor, tech groups
-- **DevPost**: Major hackathon platform
-- **Custom Sources**: TechMeme, AI/ML Events
+### `events_cli.py`
+Comprehensive CLI for all operations:
+- `discover` - Discover new events
+- `list` - List events with filters
+- `search` - Search by keyword
+- `stats` - Database statistics
+- `serve` - Run API server
+- `record-action` - Track event interactions
 
-## 🤝 Contributing
+## Frontend Features
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+- **Export Functionality**: Export events as JSON or CSV
+- **Smart Filtering**: Filter by type, location, and upcoming only
+- **Quality Metrics**: See event quality scores
+- **Days Until**: Visual indicators for upcoming events
+- **Action Tracking**: Mark events as reached out, interested, applied, or archived
 
-## 📝 License
+## Architecture
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```
+├── discover_conferences.py   # SF/NY conference discovery
+├── discover_hackathons.py    # Hackathon discovery (including online)
+├── events_cli.py            # Main CLI interface
+├── event_service.py         # Business logic layer
+├── event_repository.py      # Data access layer
+├── backend.py              # FastAPI endpoints
+├── database_utils.py       # Database models
+└── fetchers/
+    ├── sources/
+    │   └── unified_event_sources.py  # Event discovery
+    └── enrichers/
+        └── gpt_extractor.py         # AI enrichment
+```
 
-## 🙏 Acknowledgments
+## Calendar Integration
 
-- **Tavily AI**: For enhanced event discovery
-- **Crawl4AI**: For advanced web scraping capabilities
-- **OpenAI GPT-4**: For intelligent event enrichment
-- **Luma**: For comprehensive SF/NYC event coverage
+After running the discovery scripts, you can upload the JSON files to:
+- **San Francisco**: http://generativeaisf.com/
+- **New York**: https://lu.ma/genai-ny
 
----
+The exported files are formatted for easy calendar import with all necessary event details.
 
-**Built with ❤️ for the AI/Tech community in San Francisco and New York** 
+## Development
+
+```bash
+# Run tests
+pytest
+
+# Format code
+black .
+
+# Lint
+flake8
+```
+
+## License
+
+MIT

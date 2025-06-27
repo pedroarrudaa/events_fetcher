@@ -15,7 +15,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
-from config import *
+from config import (
+    MAX_POOL_SIZE, POOL_TIMEOUT, STATEMENT_TIMEOUT,
+    DB_MAX_OVERFLOW, DB_POOL_RECYCLE, DB_DEFAULT_BATCH_SIZE, DB_URL_ENRICHED_BATCH_SIZE,
+    DB_EVENT_NAME_MAX_LENGTH, DB_EVENT_URL_MAX_LENGTH, DB_EVENT_DATE_MAX_LENGTH,
+    DB_EVENT_LOCATION_MAX_LENGTH, DB_EVENT_CITY_MAX_LENGTH, DB_EVENT_TICKET_PRICE_MAX_LENGTH,
+    DB_EVENT_SOURCE_MAX_LENGTH, DB_RECENT_EVENTS_DAYS
+)
 
 load_dotenv()
 
@@ -26,11 +32,11 @@ Base = declarative_base()
 class DatabaseConfig:
     """Database configuration with sensible defaults."""
     pool_size: int = MAX_POOL_SIZE
-    max_overflow: int = 20
+    max_overflow: int = DB_MAX_OVERFLOW
     pool_timeout: int = POOL_TIMEOUT
-    pool_recycle: int = 3600
+    pool_recycle: int = DB_POOL_RECYCLE
     statement_timeout: int = STATEMENT_TIMEOUT
-    batch_size: int = 1000
+    batch_size: int = DB_DEFAULT_BATCH_SIZE
 
 class BaseEventModel:
     """Base model with common event fields."""
@@ -50,6 +56,18 @@ class BaseEventModel:
     source = Column(String, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
+class Event(Base, BaseEventModel):
+    """Unified event model for both hackathons and conferences."""
+    __tablename__ = 'events'
+    event_type = Column(String, nullable=False, index=True)  # 'hackathon' or 'conference'
+    
+    __table_args__ = (
+        Index('idx_event_type_location_date', 'event_type', 'location', 'start_date'),
+        Index('idx_event_remote_paid', 'remote', 'is_paid'),
+        Index('idx_event_type_created', 'event_type', 'created_at'),
+    )
+
+# Legacy models for backward compatibility (can be removed after migration)
 class Hackathon(Base, BaseEventModel):
     """Streamlined hackathon model."""
     __tablename__ = 'hackathons'
@@ -223,19 +241,19 @@ class DatabaseManager:
     def _normalize_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize event data for database insertion."""
         return {
-            'name': str(event.get('name', '')).strip()[:500] or 'TBD',
-            'url': str(event.get('url', '')).strip()[:1000],
-            'start_date': str(event.get('start_date', '')).strip()[:100] if event.get('start_date') else None,
-            'end_date': str(event.get('end_date', '')).strip()[:100] if event.get('end_date') else None,
-            'location': str(event.get('location', '')).strip()[:200] if event.get('location') else None,
-            'city': str(event.get('city', '')).strip()[:100] if event.get('city') else None,
+            'name': str(event.get('name', '')).strip()[:DB_EVENT_NAME_MAX_LENGTH] or 'TBD',
+            'url': str(event.get('url', '')).strip()[:DB_EVENT_URL_MAX_LENGTH],
+            'start_date': str(event.get('start_date', '')).strip()[:DB_EVENT_DATE_MAX_LENGTH] if event.get('start_date') else None,
+            'end_date': str(event.get('end_date', '')).strip()[:DB_EVENT_DATE_MAX_LENGTH] if event.get('end_date') else None,
+            'location': str(event.get('location', '')).strip()[:DB_EVENT_LOCATION_MAX_LENGTH] if event.get('location') else None,
+            'city': str(event.get('city', '')).strip()[:DB_EVENT_CITY_MAX_LENGTH] if event.get('city') else None,
             'remote': bool(event.get('remote', False)),
             'description': event.get('description'),
             'speakers': event.get('speakers') if isinstance(event.get('speakers'), (list, dict)) else None,
-            'ticket_price': str(event.get('ticket_price', ''))[:100] if event.get('ticket_price') else None,
+            'ticket_price': str(event.get('ticket_price', ''))[:DB_EVENT_TICKET_PRICE_MAX_LENGTH] if event.get('ticket_price') else None,
             'is_paid': bool(event.get('is_paid', False)),
             'themes': event.get('themes') if isinstance(event.get('themes'), (list, dict)) else None,
-            'source': str(event.get('source', ''))[:100] if event.get('source') else None,
+            'source': str(event.get('source', ''))[:DB_EVENT_SOURCE_MAX_LENGTH] if event.get('source') else None,
             'created_at': datetime.utcnow()
         }
     
@@ -288,7 +306,7 @@ class DatabaseManager:
             stats['collected_urls_count'] = session.query(CollectedUrls).count()
             
             # Recent events (last 30 days)
-            recent_date = datetime.utcnow() - timedelta(days=30)
+            recent_date = datetime.utcnow() - timedelta(days=DB_RECENT_EVENTS_DAYS)
             stats['recent_hackathons'] = session.query(Hackathon).filter(
                 Hackathon.created_at >= recent_date
             ).count()
@@ -403,7 +421,7 @@ def create_tables():
     get_db_manager().create_tables()
 
 def bulk_save_to_db(events: List[Dict[str, Any]], table_name: str, 
-                   update_existing: bool = False, batch_size: int = 1000) -> Dict[str, int]:
+                   update_existing: bool = False, batch_size: int = DB_DEFAULT_BATCH_SIZE) -> Dict[str, int]:
     """Legacy wrapper for bulk save."""
     return get_db_manager().bulk_save_events(events, table_name, update_existing)
 
@@ -417,11 +435,11 @@ def get_db_stats() -> Dict[str, Any]:
     return get_db_manager().get_database_stats()
 
 def save_collected_urls(urls_data: List[Dict[str, Any]], source_type: str, 
-                       batch_size: int = 1000) -> Dict[str, int]:
+                       batch_size: int = DB_DEFAULT_BATCH_SIZE) -> Dict[str, int]:
     """Legacy wrapper for saving URLs."""
     return get_db_manager().save_collected_urls(urls_data, source_type)
 
-def mark_urls_as_enriched_bulk(urls: List[str], batch_size: int = 500) -> int:
+def mark_urls_as_enriched_bulk(urls: List[str], batch_size: int = DB_URL_ENRICHED_BATCH_SIZE) -> int:
     """Legacy wrapper for marking URLs as enriched."""
     return get_db_manager().mark_urls_as_enriched(urls)
 

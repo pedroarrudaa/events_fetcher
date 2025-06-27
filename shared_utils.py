@@ -27,10 +27,19 @@ load_dotenv()
 
 # Add import for crawl4ai integration at the top
 try:
-    from crawl4ai_integration import crawl4ai_scrape_url, crawl4ai_check_availability
-    CRAWL4AI_AVAILABLE = crawl4ai_check_availability()
+    # Crawl4AI disabled - using simple scraping instead
+    # from fetchers.enrichers.crawl4ai import crawl4ai_scrape_url, crawl4ai_check_availability
+    CRAWL4AI_AVAILABLE = False
 except ImportError:
     CRAWL4AI_AVAILABLE = False
+
+# Import enhanced scraper at the top
+try:
+    from fetchers.scrapers.enhanced_scraper import EnhancedScraper, enhanced_scrape_url, enhanced_scrape_multiple
+    ENHANCED_SCRAPER_AVAILABLE = True
+except ImportError:
+    ENHANCED_SCRAPER_AVAILABLE = False
+    logger.log("warning", "Enhanced scraper not available, using basic scraping")
 
 # Unified Logger with context
 class Logger:
@@ -176,256 +185,162 @@ class Event:
         
         return event
 
-class EventProcessor:
-    """Streamlined event processing with method chaining."""
-    
-    def __init__(self, event_type: str):
-        self.event_type = event_type
-        self.keywords = {
-            'hackathon': ['hackathon', 'hack', 'coding', 'programming', 'developer'],
-            'conference': ['conference', 'summit', 'symposium', 'workshop', 'seminar']
-        }.get(event_type, [])
-        self.remote_indicators = ['virtual', 'remote', 'online', 'webinar']
-    
-    def validate_url(self, url: str, text: str = "") -> bool:
-        if not url or any(skip in url.lower() for skip in ['/about', '/contact', '.css', '.js']):
-            return False
-        return any(keyword in (url + " " + text).lower() for keyword in self.keywords)
-    
-    def extract_dates(self, text: str) -> tuple:
-        patterns = [
-            r'(\w+)\s+(\d+)(?:st|nd|rd|th)?\s*[-–]\s*(\d+)(?:st|nd|rd|th)?,?\s*(\d{4})',
-            r'(\d{4})-(\d{1,2})-(\d{1,2})\s*to\s*(\d{4})-(\d{1,2})-(\d{1,2})'
-        ]
-        for pattern in patterns:
-            if match := re.search(pattern, text, re.IGNORECASE):
-                try:
-                    groups = match.groups()
-                    if len(groups) >= 4:
-                        if groups[0].isdigit():  # YYYY-MM-DD format
-                            return f"{groups[0]}-{groups[1]:0>2}-{groups[2]:0>2}", f"{groups[3]}-{groups[4]:0>2}-{groups[5]:0>2}"
-                        else:  # Month name format
-                            # Use DateParser for consistent parsing and formatting
-                            start = DateParser.format_to_iso(f"{groups[0]} {groups[1]} {groups[3]}")
-                            end = DateParser.format_to_iso(f"{groups[0]} {groups[2]} {groups[3]}")
-                            return start, end
-                except: continue
-        return None, None
-    
-    def extract_location(self, text: str) -> tuple:
-        # Simple location extraction - can be enhanced
-        location_pattern = r'(?:in|at|@)\s+([A-Z][a-z\s,]+(?:(?:USA?|NY|CA|)[,\s]*)?)'
-        if match := re.search(location_pattern, text):
-            location = match.group(1).strip()
-            city = location.split(',')[0].strip()
-            return location, city
-        return None, None
-    
-    def is_remote(self, text: str) -> bool:
-        return any(indicator in text.lower() for indicator in self.remote_indicators)
-    
-    def normalize(self, raw_event: Dict[str, Any]) -> Event:
-        """Convert raw event data to normalized Event object."""
-        text = f"{raw_event.get('name', '')} {raw_event.get('description', '')}"
-        start_date, end_date = self.extract_dates(text)
-        location, city = self.extract_location(text)
-        
-        event = Event(
-            url=raw_event.get('url', ''),
-            name=raw_event.get('name', 'TBD'),
-            start_date=start_date or raw_event.get('start_date'),
-            end_date=end_date or raw_event.get('end_date'),
-            location=location or raw_event.get('location'),
-            city=city or raw_event.get('city'),
-            remote=self.is_remote(text) or bool(raw_event.get('remote')),
-            description=raw_event.get('description'),
-            speakers=raw_event.get('speakers', []),
-            themes=raw_event.get('themes', []),
-            source=raw_event.get('source', self.event_type),
-            metadata=raw_event
-        )
-        
-        # Calculate quality score
-        weights = {'name': 0.25, 'start_date': 0.2, 'location': 0.2, 'description': 0.15, 'speakers': 0.1, 'themes': 0.1}
-        event.quality_score = sum(weight for field, weight in weights.items() 
-                                 if getattr(event, field) and str(getattr(event, field)).strip() != 'TBD')
-        
-        return event
-
 class WebScraper:
-    """Enhanced web scraper with async support and Crawl4AI integration."""
+    """Enhanced web scraper with intelligent method selection."""
     
     def __init__(self):
-        self.http = HTTPClient()
-        self.clients = ServiceClients()
-        self.crawl4ai_available = CRAWL4AI_AVAILABLE
-    
-    async def scrape_async(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False, 
-                          max_retries: int = 3, semaphore: Optional[asyncio.Semaphore] = None) -> Dict[str, Any]:
-        """Async scraping with Crawl4AI support, automatic fallback, and concurrency control."""
+        self.http_client = HTTPClient()
+        self.enhanced_scraper = EnhancedScraper() if ENHANCED_SCRAPER_AVAILABLE else None
         
-        # Apply semaphore if provided
+    async def scrape_async(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False,
+                          max_retries: int = 3, semaphore: Optional[asyncio.Semaphore] = None) -> Dict[str, Any]:
+        """Async scraping with enhanced scraper support and automatic fallback."""
         if semaphore:
             async with semaphore:
                 return await self._scrape_async_internal(url, use_crawl4ai, use_firecrawl, max_retries)
         else:
             return await self._scrape_async_internal(url, use_crawl4ai, use_firecrawl, max_retries)
     
-    async def _scrape_async_internal(self, url: str, use_crawl4ai: bool = True, 
+    async def _scrape_async_internal(self, url: str, use_crawl4ai: bool = True,
                                    use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
-        """Internal async scraping method."""
-        for attempt in range(max_retries):
-            try:
-                # Try Crawl4AI first if available and enabled
-                if use_crawl4ai and self.crawl4ai_available:
-                    try:
-                        result = await crawl4ai_scrape_url(url, extract_structured=True)
-                        if result.get('success'):
-                            return {
-                                'success': True, 
-                                'content': result.get('markdown', result.get('content', '')),
-                                'structured_data': result,
-                                'method': 'crawl4ai'
-                            }
-                    except Exception as crawl_error:
-                        # Check if it's an event loop related error
-                        error_str = str(crawl_error).lower()
-                        if 'event loop' in error_str or 'different event loop' in error_str:
-                            logger.log("warning", "Crawl4AI event loop error, disabling for this session", 
-                                     url=url, error=str(crawl_error))
-                            # Disable Crawl4AI for the rest of this session
-                            self.crawl4ai_available = False
-                        else:
-                            logger.log("warning", "Crawl4AI error, trying fallback", 
-                                     url=url, error=str(crawl_error))
-                
-                # Try FireCrawl if available and enabled
-                if use_firecrawl and self.clients.firecrawl:
-                    result = self.clients.firecrawl.scrape_url(url, params={'formats': ['html'], 'onlyMainContent': True})
-                    if result.get('success'):
-                        return {'success': True, 'content': result.get('html', ''), 'method': 'firecrawl'}
-                
-                # Fallback to HTTP
-                response = self.http.get(url)
-                response.raise_for_status()
-                return {'success': True, 'content': response.text, 'method': 'http'}
-                
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    logger.log("error", "Scraping failed", url=url, error=str(e))
-                    return {'success': False, 'error': str(e)}
-                time.sleep(2 ** attempt)
+        """Internal async scraping implementation."""
         
-        return {'success': False, 'error': 'Max retries exceeded'}
+        # Use enhanced scraper if available
+        if self.enhanced_scraper and use_crawl4ai:
+            try:
+                result = await self.enhanced_scraper.scrape_async(url)
+                if result['success']:
+                    return result
+                logger.log("warning", f"Enhanced scraper failed, falling back", error=result.get('error'))
+            except Exception as e:
+                logger.log("error", "Enhanced scraper error", error=str(e))
+        
+        # Fallback to Firecrawl if requested
+        if use_firecrawl:
+            try:
+                clients = ServiceClients()
+                if clients.firecrawl:
+                    result = clients.firecrawl.scrape_url(url, {'formats': ['html']})
+                    if result.get('success'):
+                        return {
+                            'success': True,
+                            'content': result.get('html', ''),
+                            'method': 'firecrawl',
+                            'url': url
+                        }
+            except Exception as e:
+                logger.log("error", "Firecrawl error", error=str(e))
+        
+        # Final fallback to simple requests
+        return await self._simple_scrape_async(url, max_retries)
     
-    async def scrape_multiple_async(self, urls: List[str], max_concurrent: int = 5, 
-                                   use_crawl4ai: bool = True, use_firecrawl: bool = False) -> List[Dict[str, Any]]:
+    async def _simple_scrape_async(self, url: str, max_retries: int = 3) -> Dict[str, Any]:
+        """Simple async scraping with requests."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._scrape_sync_only, url, False, max_retries)
+    
+    async def scrape_multiple_async(self, urls: List[str], max_concurrent: int = 5,
+                                  use_crawl4ai: bool = True, use_firecrawl: bool = False) -> List[Dict[str, Any]]:
         """
-        Scrape multiple URLs concurrently with proper semaphore management.
+        Scrape multiple URLs concurrently with enhanced scraper.
         
         Args:
             urls: List of URLs to scrape
-            max_concurrent: Maximum number of concurrent requests
-            use_crawl4ai: Whether to use Crawl4AI
-            use_firecrawl: Whether to use FireCrawl
+            max_concurrent: Maximum concurrent requests
+            use_crawl4ai: Whether to use enhanced scraper
+            use_firecrawl: Whether to use Firecrawl as fallback
             
         Returns:
             List of scraping results
         """
-        if not urls:
-            return []
+        if self.enhanced_scraper and use_crawl4ai:
+            try:
+                return await self.enhanced_scraper.scrape_multiple_async(urls, max_concurrent)
+            except Exception as e:
+                logger.log("error", "Enhanced batch scraping failed", error=str(e))
         
-        print(f"🔍 Scraping {len(urls)} URLs concurrently (max_concurrent={max_concurrent})")
-        
-        # Create semaphore within the async context to ensure it's created in the same event loop
+        # Fallback to semaphore-based scraping
         semaphore = asyncio.Semaphore(max_concurrent)
-        
-        # Create tasks for all URLs
         tasks = [
             self.scrape_async(url, use_crawl4ai, use_firecrawl, semaphore=semaphore)
             for url in urls
         ]
-        
-        # Execute all tasks concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Handle exceptions
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.log("error", "Async scraping failed", url=urls[i], error=str(result))
-                processed_results.append({
-                    'success': False,
-                    'error': str(result),
-                    'url': urls[i]
-                })
-            else:
-                processed_results.append(result)
-        
-        successful = sum(1 for r in processed_results if r.get('success', False))
-        print(f"✅ Scraping completed: {successful}/{len(urls)} successful")
-        
-        return processed_results
+        return await asyncio.gather(*tasks)
     
     def scrape(self, url: str, use_crawl4ai: bool = True, use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
-        """Unified scraping with automatic fallback (sync version)."""
-        # For backward compatibility, provide sync version that runs async internally
+        """
+        Synchronous scraping wrapper.
+        
+        Args:
+            url: URL to scrape
+            use_crawl4ai: Whether to use enhanced scraper
+            use_firecrawl: Whether to use Firecrawl as fallback
+            max_retries: Maximum retry attempts
+            
+        Returns:
+            Scraping result dictionary
+        """
         try:
-            import asyncio
-            # Try to get existing event loop
-            try:
-                loop = asyncio.get_running_loop()
-                # If there's already a loop running, we can't use asyncio.run()
-                # So we fall back to sync methods only
-                logger.log("warning", "Event loop already running, using sync fallback only")
-                return self._scrape_sync_only(url, use_firecrawl, max_retries)
-            except RuntimeError:
-                # No event loop running, we can create one
-                return asyncio.run(self.scrape_async(url, use_crawl4ai, use_firecrawl, max_retries))
-        except Exception as e:
-            logger.log("error", "Async scraping failed, falling back to sync", error=str(e))
+            return asyncio.run(self.scrape_async(url, use_crawl4ai, use_firecrawl, max_retries))
+        except RuntimeError:
+            # If already in async context, use sync method
             return self._scrape_sync_only(url, use_firecrawl, max_retries)
     
     def _scrape_sync_only(self, url: str, use_firecrawl: bool = False, max_retries: int = 3) -> Dict[str, Any]:
-        """Synchronous-only scraping for when async is not available."""
+        """Synchronous scraping using requests only."""
         for attempt in range(max_retries):
             try:
-                if use_firecrawl and self.clients.firecrawl:
-                    result = self.clients.firecrawl.scrape_url(url, params={'formats': ['html'], 'onlyMainContent': True})
-                    if result.get('success'):
-                        return {'success': True, 'content': result.get('html', ''), 'method': 'firecrawl'}
-                
-                # Fallback to HTTP
-                response = self.http.get(url)
+                response = self.http_client.get(url, timeout=HTTP_TIMEOUT_STANDARD)
                 response.raise_for_status()
-                return {'success': True, 'content': response.text, 'method': 'http'}
                 
+                return {
+                    'success': True,
+                    'content': response.text,
+                    'method': 'requests',
+                    'url': url,
+                    'metadata': {
+                        'status_code': response.status_code,
+                        'attempt': attempt + 1
+                    }
+                }
             except Exception as e:
                 if attempt == max_retries - 1:
-                    logger.log("error", "Sync scraping failed", url=url, error=str(e))
-                    return {'success': False, 'error': str(e)}
-                time.sleep(2 ** attempt)
-        
-        return {'success': False, 'error': 'Max retries exceeded'}
+                    return {
+                        'success': False,
+                        'error': str(e),
+                        'method': 'requests',
+                        'content': '',
+                        'url': url
+                    }
+                time.sleep(2 ** attempt)  # Exponential backoff
 
 class ContentEnricher:
-    """Streamlined content enrichment using GPT."""
+    """AI-powered content enricher for events using GPT-4."""
     
     def __init__(self, event_type: str):
         self.event_type = event_type
         self.clients = ServiceClients()
         self.scraper = WebScraper()
-        self.processor = EventProcessor(event_type)
     
     def enrich(self, url: str, content: str = None) -> Event:
-        """Enrich event data using GPT extraction."""
+        """Enrich event from URL using AI extraction."""
         try:
+            # Scrape content if not provided
             if not content:
-                scrape_result = self.scraper.scrape(url)
-                if not scrape_result['success']:
-                    return Event(url=url, name='Extraction failed', metadata={'error': scrape_result['error']})
-                content = scrape_result['content'][:MAX_CONTENT_FOR_PARSING]
-            
+                logger.log("info", f"Scraping {url} for enrichment")
+                
+                # Use enhanced scraper with intelligent method selection
+                result = self.scraper.scrape(url, use_crawl4ai=True)
+                
+                if not result['success']:
+                    logger.log("error", f"Failed to scrape {url}", error=result.get('error'))
+                    return Event(url=url, name='Scraping failed', metadata={'scrape_error': result.get('error')})
+                
+                content = result['content']
+                
+                # Log scraping method used
+                logger.log("info", f"Scraped with method: {result.get('method', 'unknown')}")
+
             if not self.clients.openai:
                 return Event(url=url, name='OpenAI unavailable')
             
@@ -477,10 +392,23 @@ If information is missing, use null not "TBD". Extract what you can find."""
                     logger.log("warning", "OpenAI response not a dictionary", url=url, response=cleaned_response[:100])
                     return Event(url=url, name='Invalid AI response format')
                 
-                result['url'] = url
-                result['source'] = f'{self.event_type}_gpt'
-                
-                return self.processor.normalize(result)
+                # Create Event object from extracted data
+                return Event(
+                    url=url,
+                    name=result.get('name', 'Unknown Event'),
+                    start_date=result.get('start_date'),
+                    end_date=result.get('end_date'),
+                    location=result.get('location'),
+                    city=result.get('city'),
+                    remote=result.get('remote', False),
+                    description=result.get('description'),
+                    speakers=result.get('speakers', []),
+                    themes=result.get('themes', []),
+                    ticket_price=result.get('ticket_price'),
+                    is_paid=result.get('is_paid', False),
+                    source=f'{self.event_type}_gpt',
+                    quality_score=self._calculate_quality_score(result)
+                )
             except json.JSONDecodeError as e:
                 logger.log("error", "Failed to parse OpenAI JSON response", url=url, error=str(e), response=response_text[:200])
                 return Event(url=url, name='AI parsing failed', metadata={'ai_response': response_text[:200]})
@@ -488,116 +416,30 @@ If information is missing, use null not "TBD". Extract what you can find."""
         except Exception as e:
             logger.log("error", "Enrichment failed", url=url, error=str(e))
             return Event(url=url, name='Enrichment failed', metadata={'error': str(e)})
-
-class EventGPTExtractor:
-    """
-    Unified GPT extractor for all event types (hackathons, conferences).
     
-    This class consolidates the common GPT extraction logic to eliminate
-    code duplication between event-specific extractors.
-    """
-    
-    def __init__(self, event_type: str):
-        """
-        Initialize extractor for specific event type.
+    def _calculate_quality_score(self, data: Dict[str, Any]) -> float:
+        """Calculate quality score for extracted data."""
+        score = 0.0
+        weights = {
+            'name': 0.25,
+            'start_date': 0.2,
+            'location': 0.2,
+            'description': 0.15,
+            'speakers': 0.1,
+            'themes': 0.1
+        }
         
-        Args:
-            event_type: Type of events to extract ('hackathon' or 'conference')
-        """
-        self.event_type = event_type
-        self.enricher = ContentEnricher(event_type)
-    
-    def extract_details(self, url: str, content: str = None) -> Dict[str, Any]:
-        """
-        Extract event details from URL.
+        for field, weight in weights.items():
+            value = data.get(field)
+            if value and str(value).strip() not in ['', 'null', 'None', 'TBD']:
+                if isinstance(value, list) and len(value) > 0:
+                    score += weight
+                elif isinstance(value, str) and value:
+                    score += weight
+                elif value:
+                    score += weight
         
-        Args:
-            url: Event URL to process
-            content: Optional pre-fetched content
-            
-        Returns:
-            Dictionary containing extracted event details
-        """
-        try:
-            event_obj = self.enricher.enrich(url, content)
-            if event_obj and hasattr(event_obj, '__dict__'):
-                return event_obj.__dict__
-            return {}
-        except Exception as e:
-            logger.log("error", f"Failed to extract {self.event_type} details", url=url, error=str(e))
-            return {'enrichment_error': str(e)}
-    
-    @performance_monitor
-    def process_batch(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Process a batch of events for enrichment.
-        
-        Args:
-            events: List of event dictionaries to enrich
-            
-        Returns:
-            List of enriched event dictionaries
-        """
-        if not events:
-            return []
-        
-        enriched_events = []
-        
-        for event in events:
-            try:
-                url = event.get('url')
-                if not url:
-                    logger.log("warning", f"Skipping {self.event_type} without URL", event=event.get('name', 'Unknown'))
-                    event['enrichment_status'] = 'skipped_no_url'
-                    enriched_events.append(event)
-                    continue
-                
-                # Extract details and merge with original data
-                details = self.extract_details(url)
-                enriched_event = {**event, **details}
-                enriched_event['enrichment_status'] = 'success' if not details.get('enrichment_error') else 'error'
-                
-                enriched_events.append(enriched_event)
-                
-            except Exception as e:
-                logger.log("error", f"Failed to process {self.event_type}", event=event.get('name', 'Unknown'), error=str(e))
-                event['enrichment_error'] = str(e)
-                event['enrichment_status'] = 'error'
-                enriched_events.append(event)
-        
-        return enriched_events
-    
-    @performance_monitor
-    def enrich_data(self, raw_events: List[Dict[str, Any]], 
-                   force_reenrich: bool = False) -> List[Dict[str, Any]]:
-        """
-        Main function to enrich event data with statistics.
-        
-        Args:
-            raw_events: List of raw event data
-            force_reenrich: Whether to force re-enrichment (currently unused)
-            
-        Returns:
-            List of enriched event data with processing statistics
-        """
-        if not raw_events:
-            logger.log("info", f"No {self.event_type}s to enrich")
-            return []
-        
-        logger.log("info", f"Starting enrichment of {len(raw_events)} {self.event_type}s")
-        
-        enriched_events = self.process_batch(raw_events)
-        
-        # Log statistics
-        total = len(enriched_events)
-        successful = sum(1 for e in enriched_events if e.get('enrichment_status') == 'success')
-        errors = sum(1 for e in enriched_events if e.get('enrichment_status') == 'error')
-        skipped = total - successful - errors
-        
-        logger.log("info", f"{self.event_type.title()} enrichment completed", 
-                  successful=successful, errors=errors, skipped=skipped)
-        
-        return enriched_events
+        return min(score, 1.0)
 
 class FileManager:
     """Streamlined file operations - database-only storage."""
@@ -1002,5 +844,6 @@ def generate_summary(events: List[Event], event_type: str) -> Dict[str, Any]:
 # Legacy compatibility
 def clean_event_data(events: List[Dict[str, Any]], event_type: str = "events") -> List[Dict[str, Any]]:
     """Legacy wrapper for event cleaning."""
-    processor = EventProcessor(event_type.rstrip('s'))
-    return [processor.normalize(event).__dict__ for event in events] 
+    # Simply return events as-is since EventProcessor was removed
+    # The new EventService handles all processing
+    return events 

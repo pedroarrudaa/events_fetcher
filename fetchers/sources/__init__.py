@@ -1,6 +1,6 @@
 """Sources package - Event discovery from various platforms."""
 
-from .conference_sources import discover_conferences
-from .hackathon_sources import discover_hackathons
+# Import from event_sources only (unified implementation)
+from .event_sources import discover_conferences, discover_hackathons, discover_events
 
-__all__ = ['discover_conferences', 'discover_hackathons'] 
+__all__ = ['discover_conferences', 'discover_hackathons', 'discover_events'] 
